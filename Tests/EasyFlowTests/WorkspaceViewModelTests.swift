@@ -141,24 +141,20 @@ struct WorkspaceViewModelTests {
     model.stop()
   }
 
-  @Test("Main Task composer has no hidden effort default")
-  func taskRequiresExplicitEffort() async throws {
+  @Test("Main Task composer visibly starts at Effort 1 and creates with one submit")
+  func taskUsesDefaultEffort() async throws {
     let repository = WorkspaceRepository(
       database: try AppDatabase(inMemoryNamed: UUID().uuidString)
     )
     let model = AppShellViewModel(repository: repository)
     model.beginNewTaskCreation()
-    model.newTaskTitle = "Explicit effort"
-    #expect(model.newTaskEffort == nil)
-    model.createMainTask()
-    try await Task.sleep(for: .milliseconds(30))
-    #expect(try await repository.snapshot().activeTasks.isEmpty)
-
-    model.newTaskEffort = .two
+    model.newTaskTitle = "Default effort"
+    #expect(model.newTaskEffort == .one)
     model.createMainTask()
     try await eventually {
       try await repository.snapshot().activeTasks.count == 1
     }
+    #expect(try await repository.snapshot().activeTasks.first?.effort == .one)
   }
 
   @Test("New Task opens with title focus ready for immediate typing")
@@ -173,29 +169,64 @@ struct WorkspaceViewModelTests {
     #expect(model.newTaskTitleFocusRequestID == 0)
     model.beginNewTaskCreation()
     #expect(model.isCreatingTask)
-    #expect(!model.isSelectingNewTaskEffort)
+    #expect(model.newTaskEffort == .one)
     #expect(model.newTaskTitleFocusRequestID == 1)
   }
 
-  @Test("New Task Enter advances only after a valid title")
-  func newTaskEnterAdvancesToEffortSelection() throws {
-    let model = AppShellViewModel(
-      repository: WorkspaceRepository(
-        database: try AppDatabase(inMemoryNamed: UUID().uuidString)
-      )
-    )
-
+  @Test("Empty or whitespace title never creates a default-effort task")
+  func emptyTitleDoesNotCreateTask() async throws {
+    let repository = WorkspaceRepository(database: try AppDatabase(inMemoryNamed: UUID().uuidString))
+    let model = AppShellViewModel(repository: repository)
     model.beginNewTaskCreation()
-    model.advanceNewTaskTitleEntry()
-    #expect(!model.isSelectingNewTaskEffort)
-
-    model.newTaskTitle = "Prepare presentation"
-    model.advanceNewTaskTitleEntry()
-    #expect(model.isSelectingNewTaskEffort)
-    #expect(model.newTaskTitle == "Prepare presentation")
+    model.createMainTask()
+    model.newTaskTitle = " \n  "
+    model.createMainTask()
+    try await Task.sleep(for: .milliseconds(30))
+    #expect(try await repository.snapshot().activeTasks.isEmpty)
+    #expect(model.isCreatingTask)
+    #expect(model.newTaskEffort == .one)
   }
 
-  @Test("New Task keyboard effort creates once and resets composer")
+  @Test("Effort arrows override the default before creation")
+  func newTaskArrowSelection() async throws {
+    let repository = WorkspaceRepository(database: try AppDatabase(inMemoryNamed: UUID().uuidString))
+    let model = AppShellViewModel(repository: repository)
+    model.beginNewTaskCreation()
+    model.newTaskTitle = "Keyboard task"
+    #expect(model.newTaskEffort == .one)
+    model.moveNewTaskEffortSelection(by: 1)
+    #expect(model.newTaskEffort == .two)
+    model.moveNewTaskEffortSelection(by: 1)
+    #expect(model.newTaskEffort == .three)
+    model.moveNewTaskEffortSelection(by: -1)
+    #expect(model.newTaskEffort == .two)
+    #expect(try await repository.snapshot().activeTasks.isEmpty)
+    model.createMainTask()
+    try await eventually {
+      try await repository.snapshot().activeTasks.first?.effort == .two
+    }
+    model.beginNewTaskCreation()
+    #expect(model.newTaskEffort == .one)
+    model.cancelNewTaskCreation()
+    #expect(model.newTaskEffort == nil)
+  }
+
+  @Test("Existing effort editor starts at saved value and cancellation cannot change it")
+  func existingEffortSelectionDraft() {
+    var selection = EffortSelection(saved: .three)
+    #expect(selection.candidate == .three)
+    selection.move(by: 1)
+    #expect(selection.candidate == .four)
+    selection.move(by: 1)
+    #expect(selection.candidate == .four)
+    selection.move(by: -1)
+    #expect(selection.candidate == .three)
+    #expect(selection.saved == .three)
+    selection = EffortSelection(saved: .three)
+    #expect(selection.candidate == .three)
+  }
+
+  @Test("New Task number key selects Effort and one Return creates once")
   func newTaskKeyboardEffortCreatesOnce() async throws {
     let repository = WorkspaceRepository(
       database: try AppDatabase(inMemoryNamed: UUID().uuidString)
@@ -204,10 +235,11 @@ struct WorkspaceViewModelTests {
     model.start()
     model.beginNewTaskCreation()
     model.newTaskTitle = "Prepare presentation"
-    model.advanceNewTaskTitleEntry()
-
     #expect(model.selectNewTaskEffortFromKeyboard(2))
-    #expect(!model.selectNewTaskEffortFromKeyboard(2))
+    #expect(model.newTaskEffort == .two)
+    #expect(try await repository.snapshot().activeTasks.isEmpty)
+    model.createMainTask()
+    model.createMainTask()
     try await eventually {
       model.snapshot.activeTasks.count == 1 && !model.isCreatingTask
     }
@@ -215,11 +247,10 @@ struct WorkspaceViewModelTests {
     #expect(model.snapshot.activeTasks[0].effort == .two)
     #expect(model.newTaskTitle.isEmpty)
     #expect(model.newTaskEffort == nil)
-    #expect(!model.isSelectingNewTaskEffort)
     model.stop()
   }
 
-  @Test("New Task keyboard effort accepts only 1 through 4 in selection state")
+  @Test("New Task number keys select only 1 through 4 while composer is open")
   func newTaskKeyboardEffortScope() async throws {
     let repository = WorkspaceRepository(
       database: try AppDatabase(inMemoryNamed: UUID().uuidString)
@@ -230,12 +261,11 @@ struct WorkspaceViewModelTests {
 
     model.beginNewTaskCreation()
     model.newTaskTitle = "Scoped shortcuts"
-    #expect(!model.selectNewTaskEffortFromKeyboard(1))
     #expect(!model.selectNewTaskEffortFromKeyboard(0))
     #expect(!model.selectNewTaskEffortFromKeyboard(5))
+    #expect(model.newTaskEffort == .one)
     #expect(try await repository.snapshot().activeTasks.isEmpty)
 
-    model.advanceNewTaskTitleEntry()
     for value in 1...4 {
       let isolatedRepository = WorkspaceRepository(
         database: try AppDatabase(inMemoryNamed: UUID().uuidString)
@@ -244,8 +274,10 @@ struct WorkspaceViewModelTests {
       isolatedModel.start()
       isolatedModel.beginNewTaskCreation()
       isolatedModel.newTaskTitle = "Effort \(value)"
-      isolatedModel.advanceNewTaskTitleEntry()
       #expect(isolatedModel.selectNewTaskEffortFromKeyboard(value))
+      #expect(isolatedModel.newTaskEffort?.rawValue == value)
+      #expect(try await isolatedRepository.snapshot().activeTasks.isEmpty)
+      isolatedModel.createMainTask()
       try await eventually {
         try await isolatedRepository.snapshot().activeTasks.first?.effort?.rawValue
           == value
@@ -271,6 +303,7 @@ struct WorkspaceViewModelTests {
     model.beginNewTaskCreation()
     model.newTaskTitle = "Mouse task"
     model.newTaskEffort = .four
+    #expect(try await repository.snapshot().activeTasks.isEmpty)
     model.createMainTask()
 
     try await eventually {

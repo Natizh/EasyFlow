@@ -14,7 +14,7 @@ struct MainPanelView: View {
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .coordinateSpace(name: MainPanelCoordinateSpace.name)
-    .easyFlowPanelSurface(model.appearanceMode)
+    .easyFlowPanelSurface(model.appearanceMode, translucent: model.usesTranslucentBackground)
     .tint(EasyFlowBrand.indigo)
     .onPreferenceChange(MainTaskGeometryPreferenceKey.self) { geometries in
       model.updateTaskRows(Array(geometries.values))
@@ -176,15 +176,35 @@ struct MainPanelView: View {
     HStack {
       EasyFlowMark()
       Spacer()
-      Button {
-        InputDiagnostics.record("settings button action reached")
-        model.isSettingsPresented = true
-      } label: {
-        Image(systemName: "gearshape")
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel("Settings")
+      SettingsGearButton(model: model)
     }
+  }
+}
+
+private struct SettingsGearButton: View {
+  @ObservedObject var model: AppShellViewModel
+  @ObservedObject var updates: SoftwareUpdateService
+
+  init(model: AppShellViewModel) {
+    self.model = model
+    updates = model.updates
+  }
+
+  var body: some View {
+    Button {
+      InputDiagnostics.record("settings button action reached")
+      model.isSettingsPresented = true
+    } label: {
+      Image(systemName: "gearshape")
+        .overlay(alignment: .topTrailing) {
+          if updates.hasNewBadge {
+            Circle().fill(Color.accentColor).frame(width: 6, height: 6).offset(x: 4, y: -3)
+              .accessibilityHidden(true)
+          }
+        }
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(updates.hasNewBadge ? "Settings, update available" : "Settings")
   }
 }
 
@@ -202,12 +222,16 @@ private struct NewTaskComposer: View {
       TextField("Task title", text: $model.newTaskTitle)
         .textFieldStyle(.roundedBorder)
         .focused($focusedField, equals: .title)
-        .onSubmit { model.advanceNewTaskTitleEntry() }
+        .onSubmit { model.createMainTask() }
       HStack {
         Text(NewTaskEffortSelectionPresentation.label)
           .font(.caption)
           .foregroundStyle(.secondary)
-        NewTaskEffortStrip(model: model)
+        NewTaskEffortStrip(
+          model: model,
+          isFocused: focusedField == .effort,
+          onPointerSelection: { focusedField = .title }
+        )
           .focused($focusedField, equals: .effort)
         Spacer()
         Button("Add") { model.createMainTask() }
@@ -223,40 +247,62 @@ private struct NewTaskComposer: View {
     .onChange(of: model.newTaskTitleFocusRequestID) { _, _ in
       focusedField = .title
     }
-    .onChange(of: model.isSelectingNewTaskEffort) { _, isSelecting in
-      if isSelecting { focusedField = .effort }
-    }
     .onExitCommand { model.cancelNewTaskCreation() }
   }
 }
 
 private struct NewTaskEffortStrip: View {
   @ObservedObject var model: AppShellViewModel
+  let isFocused: Bool
+  let onPointerSelection: () -> Void
 
   var body: some View {
     HStack(spacing: 4) {
       ForEach(Effort.allCases, id: \.rawValue) { effort in
-        Button(effort.pickerLabel) { model.newTaskEffort = effort }
+        Button(effort.pickerLabel) {
+          model.newTaskEffort = effort
+          onPointerSelection()
+        }
           .buttonStyle(.bordered)
           .tint(model.newTaskEffort == effort ? .accentColor : .secondary)
+          .fontWeight(model.newTaskEffort == effort ? .bold : .regular)
+          .overlay {
+            RoundedRectangle(cornerRadius: 6)
+              .stroke(model.newTaskEffort == effort ? Color.accentColor : .clear, lineWidth: 1.5)
+          }
           .accessibilityLabel("Set effort to \(effort.rawValue) of 4")
           .accessibilityValue(model.newTaskEffort == effort ? "Selected" : "Not selected")
       }
     }
     .padding(4)
-    .focusable(model.isSelectingNewTaskEffort)
+    .focusable()
     .overlay {
       RoundedRectangle(cornerRadius: 7)
         .stroke(
-          model.isSelectingNewTaskEffort ? Color.accentColor.opacity(0.55) : .clear,
+          isFocused ? Color.accentColor.opacity(0.55) : .clear,
           lineWidth: 1
         )
     }
     .onKeyPress { press in
-      guard let rawValue = Int(press.characters),
-        model.selectNewTaskEffortFromKeyboard(rawValue)
-      else { return .ignored }
-      return .handled
+      switch press.key {
+      case .leftArrow:
+        model.moveNewTaskEffortSelection(by: -1)
+        return .handled
+      case .rightArrow:
+        model.moveNewTaskEffortSelection(by: 1)
+        return .handled
+      case .return:
+        model.createMainTask()
+        return .handled
+      case .escape:
+        model.cancelNewTaskCreation()
+        return .handled
+      default:
+        guard let rawValue = Int(press.characters),
+          model.selectNewTaskEffortFromKeyboard(rawValue)
+        else { return .ignored }
+        return .handled
+      }
     }
   }
 }

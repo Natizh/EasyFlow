@@ -8,6 +8,7 @@ protocol PointerLocationReporting: AnyObject {
 
 final class PointerTrackingView: NSView, PointerLocationReporting {
   var onPointerMoved: ((CGPoint) -> Void)?
+  var onPointerEntered: (() -> Void)?
   private var pointerTrackingArea: NSTrackingArea?
 
   override func updateTrackingAreas() {
@@ -27,6 +28,7 @@ final class PointerTrackingView: NSView, PointerLocationReporting {
   }
 
   override func mouseEntered(with event: NSEvent) {
+    onPointerEntered?()
     reportPointer()
   }
 

@@ -55,19 +55,25 @@ The dependency container composes concrete platform services at launch. Domain a
 
 The app launches as a resident utility, initializes the local database and settings, installs edge observation, and normally exposes no UI. First-run permission and list setup are coordinated without making local operation wholly dependent on EventKit availability. Launch-at-login setup uses native APIs and remains configurable through Settings.
 
-Appearance preference is stored in UserDefaults and drives both hosted panel surfaces. Standard and Frosted are macOS 14-safe; Liquid Glass is compiled behind a macOS 26 availability check. SMAppService reports and changes main-app login registration from Settings. Reduce Motion bypasses AppKit frame animation, while Reduce Transparency and increased contrast alter panel surfaces without changing layout.
+Appearance and panel customization preferences are stored in UserDefaults and drive both hosted panel surfaces and the centralized `PanelLayout`. Standard and Frosted are macOS 14-safe; Liquid Glass is compiled behind a macOS 26 availability check. The translucency preference is an optional explicit override: without one, Standard remains solid and Frosted/Liquid Glass remain material-based. Reduce Transparency always forces a solid surface. SMAppService reports and changes main-app login registration from Settings. Reduce Motion bypasses AppKit frame animation, while increased contrast adjusts borders without changing layout.
 
 EasyFlow runs with the accessory activation policy and has no Dock icon or menu-bar item.
 
+`SoftwareUpdateService` owns an event-driven daily GitHub release check, a manual check, and update state observed by Settings. It uses the installed bundle's numeric semantic version and an explicit `development`/`public` channel. Only public builds with a pinned Ed25519 key can install. `UpdateSecurity` authenticates a signed manifest and archive before extraction; `UpdateInstaller` is a separate invocation of a copied app executable after normal save-aware termination. It stages, validates, replaces with a retained rollback bundle, and relaunches. The updater does not touch the workspace database or EventKit. See [UPDATES.md](UPDATES.md).
+
 ## Window and panel architecture
 
-The panel coordinator owns both overlay windows as one coordinated interaction surface:
+The panel coordinator owns both overlay windows as one coordinated interaction surface. It stores one desired Main/Secondary presentation, repairs Main before any Secondary show, and reapplies paired frames and ordering after layout changes, Space changes, and superseded animation completions. `isVisible` alone cannot establish a valid Main: its active-Space membership, closing state, alpha, and edge frame also matter. A visible window reported off the active Space is ordered out once before being presented there again. Secondary's retraction stops inward of Main instead of overlapping its frame:
+
+`PanelCustomization` stores a Classic/Compact/Spacious/Custom preset and retained Custom point values. `PanelSizing.dimensions` resolves it against the selected display; Classic takes the unchanged responsive width and vertical-inset path. Other presets and Custom are bounded by paired-panel horizontal fit and a 32-point top/bottom margin. `AppShellCoordinator` reuses its screen-configuration path when the preference changes, so the existing presentation generations invalidate stale animations and Main/Secondary settle together. There is no polling or separate window geometry path in Settings.
+
+Settings dimension sliders use one `NSViewRepresentable` containing a native `NSSlider` for pointer, keyboard, and accessibility behavior. Native tick marks are explicitly zero; a single ruler is drawn using the slider cell's actual bar rectangle. Both Width and Height share this component and one 10-point quantization rule.
 
 - Main is anchored to the selected outer desktop edge (Right by default).
 - Secondary is immediately inward from Main and changes content between Quick Notes and task details.
 - Panels use window levels and collection behavior suitable for fullscreen applications and Spaces without changing the underlying app layout.
 - The coordinator owns show/hide ordering, geometry, transition cancellation, previous-app focus context, and reconfiguration after display changes.
-- The screen monitor observes `NSWorkspace.activeSpaceDidChangeNotification` through the workspace notification center. A Space transition cancels stale dwell/close tasks, stabilizes in-flight state, and asks the coordinator to reconcile every window from logical presentation intent rather than `NSWindow.isVisible`; AppKit's `isOnActiveSpace` is used when deciding whether an existing ordered panel can be reused.
+- The screen monitor observes `NSWorkspace.activeSpaceDidChangeNotification` through the workspace notification center. A Space transition cancels stale dwell/close tasks, stabilizes in-flight state, and asks the coordinator to reconcile every window from logical presentation intent rather than `NSWindow.isVisible`; AppKit's `isOnActiveSpace` is used when deciding whether an existing ordered panel can be reused. Timer generations also reject a callback that was already queued when its task was cancelled.
 - Presentation exposes centralized frame/opacity animation hooks: Main's hidden frame is beyond the selected edge, while Secondary's hidden frame retracts toward Main. Context replacement never recreates the Secondary window.
 - The internal reminder banner is a separate small nonactivating panel owned by the same coordinator. It never steals focus when shown; banner clicks re-enter the panel state machine with an explicit task-open event.
 - SwiftUI renders content and emits semantic actions; it does not directly orchestrate global windows.
@@ -87,7 +93,9 @@ The pure state machine separates pointer crossing, 300 ms potential activation, 
 
 The activation panel and visible overlays use `.canJoinAllSpaces` and `.fullScreenAuxiliary` at status-bar window level. EasyFlow does not install activation edges on other displays.
 
-Activation, Main, Secondary, and reminder-banner panels share one collection-behavior configuration, including `.stationary` for Mission Control and `.ignoresCycle`. After a Space change, the activation edge is ordered first, then Main and Secondary are restored in coordinated order when logically presented; visible reminder and auxiliary windows are reasserted independently.
+Activation, Main, Secondary, and reminder-banner panels share `.canJoinAllSpaces`, `.fullScreenAuxiliary`, and `.ignoresCycle`. They do not use `.stationary`, whose documented effect concerns Mission Control rather than active fullscreen presentation. `showMain` orders its nonactivating panel without first activating the EasyFlow application, so a pointer gesture in fullscreen does not select EasyFlow's ordinary Desktop Space. After a Space change, the activation edge is ordered first, then Main and Secondary are restored in coordinated order when logically presented; visible reminder and auxiliary windows are reasserted independently. The coordinator repeats this reconciliation once on the next main-run-loop turn, after AppKit has had a chance to assign windows to the new Space. A generation token prevents an older Space notification from overriding a newer one.
+
+Development-channel Settings can enable event-only fullscreen diagnostics through public `NSWindow.isOnActiveSpace`, `NSWorkspace` notifications, and the Core Graphics on-screen window list. macOS has no supported public numeric active-Space identifier, so diagnostics log a Space-transition epoch, the frontmost app, display ID, panel frames/levels/collection behavior, active-Space membership, and on-screen window-list rank. Public builds omit the diagnostics section and update-preview controls from the Settings view hierarchy and keep diagnostics disabled. No task or note content is recorded.
 
 ## State management and data flow
 
@@ -154,7 +162,7 @@ GitHub Actions runs `swift package resolve`, `swift build`, and `swift test` on 
 
 ## Packaging
 
-`scripts/build-dev-app.sh` and `scripts/build-release-app.sh` create ad-hoc-signed app bundles for local use. Both use `io.github.natizh.easyflow`, the Reminders usage description, and UIElement lifecycle. The scripts generate `EasyFlow.icns` when a complete PNG iconset is present. Public distribution still requires Developer ID signing and notarization.
+`scripts/build-dev-app.sh` and `scripts/build-release-app.sh` create ad-hoc-signed development-channel app bundles for local use. Both use `io.github.natizh.easyflow`, the Reminders usage description, and UIElement lifecycle. The scripts generate `EasyFlow.icns` when a complete PNG iconset is present. `scripts/build-public-update-app.sh` prepares a public-channel bundle only with an externally supplied Ed25519 verification key; `scripts/package-public-update.sh` signs its archive metadata with an external private key. Developer ID and notarization are not required for the updater's independent artifact authentication, though macOS may require manual Gatekeeper confirmation on first launch.
 
 ## Native editing and auxiliary panels (v1.2)
 

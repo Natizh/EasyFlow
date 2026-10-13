@@ -14,6 +14,21 @@ done
 [[ -x "$app_bundle/Contents/MacOS/EasyFlow" ]]
 [[ -s "$app_bundle/Contents/Resources/EasyFlow.icns" ]]
 codesign --verify --deep --strict "$app_bundle"
+channel="$(plutil -extract EasyFlowBuildChannel raw "$plist")"
+if [[ "$channel" != "development" && "$channel" != "public" ]]; then
+  print -u2 -r -- "Unknown EasyFlow build channel: $channel"
+  exit 1
+fi
+if [[ "$channel" == "public" ]]; then
+  key="$(plutil -extract EasyFlowUpdatePublicKey raw "$plist")"
+  python3 - "$key" <<'PY'
+import base64, sys
+try:
+    assert len(base64.b64decode(sys.argv[1], validate=True)) == 32
+except Exception:
+    raise SystemExit('Public update build requires a 32-byte Ed25519 verification key')
+PY
+fi
 python3 - "$app_bundle" <<'PY'
 from pathlib import Path
 import sys

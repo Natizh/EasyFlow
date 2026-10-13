@@ -277,6 +277,123 @@ struct PanelStateMachineTests {
     #expect(machine.handle(.mainDismissalElapsed).isEmpty)
   }
 
+  @Test("Main always precedes Secondary when opened from a hidden state")
+  func hiddenToBothOrdering() {
+    var machine = PanelStateMachine(timing: timing)
+    let context = SecondaryPanelContext.task(id: UUID())
+    let commands = machine.handle(.openFromReminder(context))
+    #expect(commands.firstIndex(of: .showMain)! < commands.firstIndex(of: .showSecondary(context))!)
+    #expect(machine.state == .secondaryVisible(context: context))
+  }
+
+  @Test("A Secondary request during pending Main dismissal cancels the old timer")
+  func secondaryDuringMainDismissal() {
+    var machine = activatedMachine()
+    _ = machine.handle(.pointerChanged(.main))
+    _ = machine.handle(.pointerChanged(.outside))
+    let context = SecondaryPanelContext.task(id: UUID())
+    #expect(machine.handle(.requestSecondary(context)) == [
+      .cancel(timer: .mainDismissal), .showSecondary(context),
+    ])
+    #expect(machine.handle(.mainDismissalElapsed).isEmpty)
+    #expect(machine.state == .secondaryVisible(context: context))
+  }
+
+  @Test("Rapid open close open leaves the latest context presented")
+  func rapidOpenCloseOpen() {
+    var machine = activatedMachine()
+    let first = SecondaryPanelContext.task(id: UUID())
+    let second = SecondaryPanelContext.task(id: UUID())
+    _ = machine.handle(.requestSecondary(first))
+    _ = machine.handle(.clearSecondary)
+    #expect(machine.handle(.requestSecondary(second)) == [.showSecondary(second)])
+    #expect(machine.state == .secondaryVisible(context: second))
+    #expect(machine.handle(.secondaryDismissalElapsed).isEmpty)
+  }
+
+  @Test("Activation edge re-entry wins over a pending close")
+  func activationDuringPendingDismissal() {
+    var machine = activatedMachine()
+    _ = machine.handle(.pointerChanged(.main))
+    _ = machine.handle(.pointerChanged(.outside))
+    #expect(machine.handle(.pointerChanged(.activationEdge)) == [
+      .cancel(timer: .mainDismissal), .showMain,
+    ])
+    #expect(machine.handle(.mainDismissalElapsed).isEmpty)
+  }
+
+  @Test("Context replacement while Secondary closes uses only the newest task")
+  func replacementDuringSecondaryDismissal() {
+    var machine = activatedMachine()
+    let first = SecondaryPanelContext.task(id: UUID())
+    let second = SecondaryPanelContext.task(id: UUID())
+    _ = machine.handle(.requestSecondary(first))
+    _ = machine.handle(.pointerChanged(.outside))
+    #expect(machine.handle(.requestSecondary(second)) == [
+      .cancel(timer: .secondaryDismissal), .showSecondary(second),
+    ])
+    #expect(machine.handle(.secondaryDismissalElapsed).isEmpty)
+    #expect(machine.state == .secondaryVisible(context: second))
+  }
+
+  @Test("Repeated activation and Space reconciliation do not duplicate presentation commands")
+  func repeatedActivationAndSpaceChange() {
+    var machine = activatedMachine()
+    #expect(machine.handle(.pointerChanged(.activationEdge)).isEmpty)
+    #expect(machine.handle(.activationDwellElapsed).isEmpty)
+    #expect(machine.handle(.activeSpaceChanged).last == .reconcileActiveSpace(.main))
+    #expect(machine.handle(.activeSpaceChanged).last == .reconcileActiveSpace(.main))
+    #expect(machine.state == .mainVisible(isEngaged: true))
+  }
+
+  @Test("Space change during Secondary presentation preserves Main and context")
+  func spaceDuringSecondaryOpening() {
+    var machine = activatedMachine()
+    let context = SecondaryPanelContext.task(id: UUID())
+    _ = machine.handle(.requestSecondary(context))
+    #expect(machine.handle(.activeSpaceChanged).last == .reconcileActiveSpace(.mainAndSecondary(context)))
+    #expect(machine.state == .secondaryVisible(context: context))
+  }
+
+  @Test("Rapid Main Secondary traversal keeps both panels presented")
+  func rapidTraversal() {
+    var machine = activatedMachine()
+    let context = SecondaryPanelContext.task(id: UUID())
+    _ = machine.handle(.requestSecondary(context))
+    for region in [PointerRegion.main, .bridge, .secondary, .bridge, .main] {
+      #expect(machine.handle(.pointerChanged(region)).isEmpty)
+      #expect(machine.state == .secondaryVisible(context: context))
+    }
+  }
+
+  @Test("Desktop to fullscreen before dwell re-arms the edge on the new Space")
+  func spaceChangeBeforeActivation() {
+    var machine = PanelStateMachine(timing: timing)
+    _ = machine.handle(.pointerChanged(.activationEdge))
+    #expect(machine.handle(.activeSpaceChanged).contains(.cancel(timer: .activationDwell)))
+    #expect(machine.state == .hidden)
+    #expect(machine.handle(.pointerChanged(.activationEdge)) == [
+      .schedule(timer: .activationDwell, after: timing.activationDwell)
+    ])
+    #expect(machine.handle(.activationDwellElapsed) == [.showMain, .focusQuickNote])
+  }
+
+  @Test("Successive fullscreen Spaces preserve paired panels and discard stale closes")
+  func successiveFullscreenSpaces() {
+    var machine = activatedMachine()
+    let context = SecondaryPanelContext.task(id: UUID())
+    _ = machine.handle(.requestSecondary(context))
+    _ = machine.handle(.pointerChanged(.outside))
+    #expect(machine.handle(.activeSpaceChanged).last == .reconcileActiveSpace(.mainAndSecondary(context)))
+    #expect(machine.handle(.secondaryDismissalElapsed).isEmpty)
+    _ = machine.handle(.pointerChanged(.outside))
+    #expect(machine.handle(.activeSpaceChanged).last == .reconcileActiveSpace(.mainAndSecondary(context)))
+    #expect(machine.state == .secondaryVisible(context: context))
+    #expect(machine.handle(.secondaryDismissalElapsed).isEmpty)
+    #expect(machine.handle(.pointerChanged(.secondary)).isEmpty)
+    #expect(machine.state.isMainPresented)
+  }
+
   @Test("Reminder scheduler keeps active timer across unrelated workspace edits")
   func reminderSchedulerKeepsTimerForUnrelatedEdits() {
     let now = Date(timeIntervalSince1970: 1_000)

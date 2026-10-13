@@ -43,11 +43,13 @@ EasyFlow runs throughout a Mac session, so the invisible state must use very lit
 
 EasyFlow overlays ordinary, maximized, fullscreen, and Space-hosted applications without resizing or shifting them. Its desired availability is analogous to an always-present system utility, but it uses the right edge rather than the display notch.
 
+Activation inside a native fullscreen Space must present Main, then any contextual Secondary, above that fullscreen application on the same Space. The pointer gesture must not switch to an ordinary Desktop Space or activate EasyFlow merely to order its nonactivating panels. Dismissing the workspace leaves the user in the same fullscreen application and Space.
+
 ## Panel model
 
 EasyFlow has a Main Panel at the selected outer edge and one contextual Secondary Panel immediately inward from it. Left mirrors Right, including motion, traversal, and dismissal geometry.
 
-The Main Panel occupies about 20% of the current display width, clamped to 360–520 points. The Secondary Panel uses the same responsive rule.
+Classic, the default size, preserves the original panel geometry: each panel occupies 20% of the selected display width clamped to 360–520 points, with a vertical inset of 8% of display height clamped to 64–96 points. Both panels always have the same actual height; content longer than that height scrolls inside. Compact and Spacious offer smaller and larger paired dimensions. Custom provides Width and Height in points, clamped to keep both panels inside the selected display. Size changes apply live to the coordinated panels, and the selected preset and Custom values persist locally.
 
 The Main Panel contains, in order:
 
@@ -93,9 +95,9 @@ V1 does not add categories, tags, due dates, or a separate priority field.
 
 ### Creation and effort
 
-The small `+ New Task` control enters an inline title and compact `1...4` effort flow. No effort is silently defaulted; the task is finalized only after both a non-empty title and explicit effort exist. EasyFlow persists the task locally and creates the corresponding Reminder during synchronization.
+The small `+ New Task` control enters an inline title and compact `1...4` effort flow. Title receives focus immediately and Effort `1` is visibly selected by default. Return in the title field creates the task immediately when the title is non-empty; an empty or whitespace-only title never creates a task. The user may choose another effort with the mouse or, after focusing the effort strip, with Left/Right arrows or number keys `1...4`, then confirm with Return or Add. Escape cancels. EasyFlow persists the task locally and creates the corresponding Reminder during synchronization. This creation default does not apply to externally imported Reminders, which remain unrated until assigned locally.
 
-Effort is editable and appears as a compact four-dot indicator.
+Effort is editable and appears as a compact four-dot indicator. An existing task's effort editor starts at the saved value; arrow navigation remains a draft until Return, Escape retains the saved value, and clicking a new value updates immediately.
 
 ### Ordering and appearance
 
@@ -168,13 +170,15 @@ EasyFlow has an internal lightweight reminder banner for Main Tasks. It is not a
 
 When reminder banners are disabled, Settings collapses the frequency and pause controls. Custom frequency and Custom pause use compact inline minus/value/plus controls with 5-minute adjustments from 5 minutes through 12 hours; Custom pause stays hidden until requested.
 
-The Main Panel gear opens a dedicated centered native Settings panel with the running bundle version/build, immediate Left/Right Panel Side selection, reminder enable/frequency/pause controls, and real controls for Standard/Frosted/Liquid Glass appearance, Compact/Comfortable Main Task row density, native Launch at Login, and Reminders connection/recovery. Current activation and panel geometry are shown as factual information.
+The Main Panel gear opens a dedicated centered native Settings panel with the running bundle version/build, immediate Left/Right Panel Side selection, Classic/Compact/Spacious/Custom panel size, actual Width and Height controls, a Translucent background preference, reminder enable/frequency/pause controls, and real controls for Standard/Frosted/Liquid Glass appearance, Compact/Comfortable Main Task row density, native Launch at Login, and Reminders connection/recovery. It also offers Quit and a manual uninstall aid that deregisters Launch at Login, reveals the app in Finder, and quits after pending edits are saved. The user moves the app to Trash; the workflow leaves local data, preferences, and Apple Reminders untouched. Current activation and panel geometry are shown as factual information.
 
 EasyFlow can register as a login item through `SMAppService`, and Settings reflects whether macOS enabled it or requires approval. First run handles Reminders authorization and finding or creating the EasyFlow list. Authorization states include not determined, authorized, denied/restricted, and unavailable/error. Permission is not repeatedly requested once decided, and the local workspace remains available when Reminders access is denied.
 
+Settings includes Software Updates with the installed version/build, an enabled-by-default automatic-check preference, a manual Check for Updates action, stable-release notes, Install Update when a signed release is verifiable, and Later. Public builds check GitHub Releases shortly after launch when due and about daily thereafter without opening the workspace or stealing focus. Installation always requires an explicit user action. Development builds do not check automatically and cannot install public updates. Public artifacts require signed metadata authenticated by a pinned Ed25519 key; historical unsigned releases remain manual downloads. A writable installed app may be replaced after a save-aware quit with rollback, while read-only, translocated, or administrator-owned locations offer a verified manual-install path. Workspace data and Apple Reminders are never part of update replacement. See `docs/UPDATES.md`.
+
 The baseline design uses system typography, SF Symbols, macOS materials, adaptive light/dark mode, native spacing, restrained translucency/shadows, continuous corners, subtle animation, and appropriate context menus. Avoid a web-dashboard look, Electron chrome, giant controls, gratuitous gradients, and excessive animation.
 
-Standard and Frosted appearances work on the minimum deployment target, macOS 14. macOS 26 adds optional Liquid Glass. Reduce Transparency falls back to an opaque native surface, and Liquid Glass never gates functionality.
+Standard and Frosted appearances work on the minimum deployment target, macOS 14. macOS 26 adds optional Liquid Glass. The Translucent background preference uses a material appropriate to the selected appearance when enabled and an opaque native surface when disabled. Its initial value follows the appearance until the user explicitly changes it, preserving the existing Standard and Frosted defaults. Reduce Transparency always falls back to an opaque native surface, and Liquid Glass never gates functionality.
 
 ## Performance, privacy, and reliability
 

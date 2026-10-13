@@ -38,6 +38,10 @@ EasyFlow releases are distributed through [GitHub Releases](https://github.com/N
 
 The current community release is ad-hoc signed, not signed with an Apple Developer ID and not notarized. macOS may therefore block the first launch. If that happens, Control-click `EasyFlow.app`, choose **Open**, then confirm. If macOS still blocks it, open **System Settings → Privacy & Security** and choose **Open Anyway** for EasyFlow. This override is only needed for the first launch of that build.
 
+The first release with signed in-app updates must be installed manually using these steps. After that trust bootstrap, public builds can check GitHub Releases in Settings and install newer releases whose artifacts pass EasyFlow's pinned Ed25519 signature checks. Local development builds cannot auto-install public releases.
+
+EasyFlow v1.5.0 is the first updater-enabled release. Its [release notes](docs/releases/v1.5.0.md) record the public-key fingerprint and the new fullscreen, panel customization, task-entry, and Settings changes.
+
 If the Releases page does not contain a build yet, use the source installation below.
 
 ### Build and install from source
@@ -57,12 +61,12 @@ The installer builds the release app, copies it to `/Applications` when possible
 1. Launch EasyFlow. It runs without a Dock icon or menu-bar item.
 2. Move the pointer to the selected outer desktop edge (Right by default) and hold it there briefly.
 3. Type into Quick Notes. **Return** saves the note and readies the composer for the next one.
-4. Select **New Task**, enter a title, and choose an effort from 1 to 4.
+4. Select **New Task**, enter a title, and press Return. Effort starts at 1; you can select 2–4 before creating the task.
 5. Hover a task to open its detail panel with Description, Steps, and Attached Notes.
 6. Drag Quick Notes onto tasks to move them into Attached Notes.
 7. Drag tasks, Quick Notes, and Steps directly to reorder them.
 8. Complete a task to move it into Recently Completed. EasyFlow shows the five most recent completed tasks; there is currently no restore action.
-9. Use the gear for centered Settings: Panel Side, task reminder frequency and pause, appearance, Main Task row density, Reminders status, Launch at Login, and the running version.
+9. Use the gear for centered Settings: Panel Side, panel size and surface, task reminder frequency and pause, appearance, Main Task row density, Reminders status, Software Updates, Launch at Login, and the running version.
 
 ## Features
 
@@ -110,7 +114,7 @@ Building from source additionally requires Swift 6 through Xcode or the Xcode Co
 
 Current behavior and implementation boundaries live in [PRODUCT_SPEC.md](PRODUCT_SPEC.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [DATA_MODEL.md](docs/DATA_MODEL.md), [UX_BEHAVIOR.md](docs/UX_BEHAVIOR.md), [REMINDERS_SYNC.md](docs/REMINDERS_SYNC.md), and [AGENTS.md](AGENTS.md).
 
-Run `swift build` and `swift test` before submitting changes. `./scripts/package-release.sh` creates a validated `dist/EasyFlow.zip` plus its SHA-256 checksum. Pushing a version tag that exactly matches `CFBundleShortVersionString` (for example, app version `1.1.0` uses tag `v1.1.0`) runs the release workflow and publishes those files to GitHub Releases.
+Run `swift build` and `swift test` before submitting changes. `./scripts/package-release.sh` creates a validated development-channel ZIP for CI and local inspection. Public updater releases require a separately prepared app and signed assets; publication is a manual, explicitly approved step. See [Signed GitHub updates](docs/UPDATES.md) for the key setup, packaging, validation, and release procedure. Pushing a tag alone does not publish a release.
 
 ## License
 

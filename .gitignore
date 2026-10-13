@@ -7,6 +7,9 @@
 .build/
 .swiftpm/
 dist/
+dist-public/
+__pycache__/
+*.pyc
 
 # Xcode build and user state
 DerivedData/
@@ -32,8 +35,13 @@ build/
 !.env.example
 *.pem
 *.p12
+*.key
+*.ed25519
 *.mobileprovision
 Secrets.swift
+EasyFlowSigning/
+update-private-key.txt
+*private-signing-key*
 
 # Local tooling and logs
 *.log

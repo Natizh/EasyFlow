@@ -105,4 +105,55 @@ struct PanelLayoutTests {
       ) == .secondary
     )
   }
+
+  @Test("Both panel targets remain distinct on Left and Right displays")
+  func pairedTargetsMirrorWithoutOverlap() {
+    for side in PanelSide.allCases {
+      let layout = PanelLayout(
+        display: DisplaySnapshot(id: 2, frame: CGRect(x: -1728, y: -120, width: 1728, height: 1117)),
+        side: side
+      )
+      let target = CoordinatedPanelTarget(presentation: .mainAndSecondary(.quickNotes), layout: layout)
+      #expect(target.mainIsRequired)
+      #expect(target.secondaryIsRequired)
+      #expect(!layout.mainFrame.intersects(layout.secondaryFrame))
+      #expect(!layout.mainFrame.intersects(layout.secondaryHiddenFrame))
+      #expect(layout.mainFrame == PanelLayout(display: layout.display, side: side).mainFrame)
+    }
+  }
+
+  @Test("A hidden, off-Space, closing, or misplaced Main requires repair")
+  func mainRepairObservations() {
+    let layout = PanelLayout(display: DisplaySnapshot(id: 1,
+      frame: CGRect(x: 0, y: 0, width: 1920, height: 1080)))
+    let target = CoordinatedPanelTarget(presentation: .mainAndSecondary(.quickNotes), layout: layout)
+    let healthy = PanelWindowObservation(isVisible: true, isOnActiveSpace: true,
+      frame: layout.mainFrame, alpha: 1, isClosing: false)
+    #expect(!target.mainNeedsRepair(healthy))
+    #expect(target.mainNeedsRepair(.init(isVisible: false, isOnActiveSpace: true,
+      frame: layout.mainFrame, alpha: 1, isClosing: false)))
+    #expect(target.mainNeedsRepair(.init(isVisible: true, isOnActiveSpace: false,
+      frame: layout.mainFrame, alpha: 1, isClosing: false)))
+    #expect(target.mainNeedsRepair(.init(isVisible: true, isOnActiveSpace: true,
+      frame: layout.mainHiddenFrame, alpha: 0, isClosing: false)))
+    #expect(target.mainNeedsRepair(.init(isVisible: true, isOnActiveSpace: true,
+      frame: layout.mainFrame, alpha: 1, isClosing: true)))
+  }
+
+  @Test("Reconciliation target is stable across repeated calls and display changes")
+  func repeatedTargetReconciliation() {
+    let display = DisplaySnapshot(id: 1, frame: CGRect(x: 0, y: 0, width: 2560, height: 1440))
+    let original = CoordinatedPanelTarget(presentation: .mainAndSecondary(.quickNotes),
+      layout: PanelLayout(display: display))
+    #expect(original == CoordinatedPanelTarget(presentation: original.presentation, layout: original.layout))
+    let secondary = PanelWindowObservation(isVisible: true, isOnActiveSpace: true,
+      frame: original.layout.mainFrame, alpha: 1, isClosing: false)
+    #expect(original.secondaryNeedsRepair(secondary))
+    let changed = CoordinatedPanelTarget(presentation: original.presentation,
+      layout: PanelLayout(display: DisplaySnapshot(id: 3,
+        frame: CGRect(x: 2560, y: -80, width: 1512, height: 982))))
+    #expect(changed.layout.secondaryFrame != original.layout.secondaryFrame)
+    #expect(changed.secondaryNeedsRepair(.init(isVisible: true, isOnActiveSpace: true,
+      frame: original.layout.secondaryFrame, alpha: 1, isClosing: false)))
+  }
 }

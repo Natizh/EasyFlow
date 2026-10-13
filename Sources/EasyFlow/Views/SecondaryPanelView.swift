@@ -25,7 +25,7 @@ struct SecondaryPanelView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .padding(20)
     .coordinateSpace(name: SecondaryPanelCoordinateSpace.name)
-    .easyFlowPanelSurface(model.appearanceMode)
+    .easyFlowPanelSurface(model.appearanceMode, translucent: model.usesTranslucentBackground)
     .tint(EasyFlowBrand.indigo)
     .simultaneousGesture(TapGesture().onEnded { model.registerInteraction() })
     .onPreferenceChange(StepRowGeometryPreferenceKey.self) { geometries in
@@ -217,6 +217,8 @@ private struct TaskDetailView: View {
   let task: MainTask
   @ObservedObject var model: AppShellViewModel
   @State private var newStepTitle = ""
+  @State private var isEditingEffort = false
+  @State private var effortSelection: EffortSelection?
 
   private var steps: [TaskStep] { model.snapshot.stepsByTask[task.id] ?? [] }
   private var attachedNotes: [WorkspaceNote] {
@@ -250,18 +252,30 @@ private struct TaskDetailView: View {
             }
             .accessibilityLabel("Effort not set")
           } else {
-            Menu {
-              ForEach(Effort.allCases, id: \.rawValue) { effort in
-                Button(effort.pickerLabel) {
-                  model.updateMainTask(id: task.id, effort: effort)
+            HStack(spacing: 5) {
+              Button {
+                effortSelection = EffortSelection(saved: task.effort)
+                isEditingEffort.toggle()
+              } label: {
+                EffortIndicator(effort: task.effort)
+              }
+              .buttonStyle(.plain)
+              .accessibilityLabel("Change effort: \(task.title)")
+              .accessibilityValue("\(task.effort?.rawValue ?? 0) of 4")
+              if isEditingEffort {
+                ExistingTaskEffortStrip(selection: Binding(
+                  get: { effortSelection ?? EffortSelection(saved: task.effort) },
+                  set: { effortSelection = $0 }
+                )) { selected in
+                  model.updateMainTask(id: task.id, effort: selected)
+                  isEditingEffort = false
+                  effortSelection = nil
+                } onCancel: {
+                  isEditingEffort = false
+                  effortSelection = nil
                 }
               }
-            } label: {
-              EffortIndicator(effort: task.effort)
             }
-            .menuStyle(.borderlessButton)
-            .accessibilityLabel("Change effort: \(task.title)")
-            .accessibilityValue("\(task.effort?.rawValue ?? 0) of 4")
           }
         }
         section("Description") {
@@ -337,6 +351,50 @@ private struct TaskDetailView: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(.secondary)
       content()
+    }
+  }
+}
+
+private struct ExistingTaskEffortStrip: View {
+  @Binding var selection: EffortSelection
+  let onConfirm: (Effort) -> Void
+  let onCancel: () -> Void
+  @FocusState private var isFocused: Bool
+
+  var body: some View {
+    HStack(spacing: 3) {
+      ForEach(Effort.allCases, id: \.rawValue) { effort in
+        Button(effort.pickerLabel) { onConfirm(effort) }
+          .buttonStyle(.bordered)
+          .controlSize(.small)
+          .tint(selection.candidate == effort ? .accentColor : .secondary)
+          .accessibilityLabel("Set effort to \(effort.rawValue) of 4")
+          .accessibilityValue(selection.candidate == effort ? "Selected" : "Not selected")
+      }
+    }
+    .padding(3)
+    .focusable()
+    .focused($isFocused)
+    .overlay {
+      RoundedRectangle(cornerRadius: 7)
+        .stroke(isFocused ? Color.accentColor : .clear, lineWidth: 1.5)
+    }
+    .onAppear { isFocused = true }
+    .onKeyPress { press in
+      switch press.key {
+      case .leftArrow, .rightArrow:
+        let offset = press.key == .rightArrow ? 1 : -1
+        selection.move(by: offset)
+        return .handled
+      case .return:
+        if let candidate = selection.candidate { onConfirm(candidate) }
+        return .handled
+      case .escape:
+        onCancel()
+        return .handled
+      default:
+        return .ignored
+      }
     }
   }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 
 @MainActor
 final class AppShellViewModel: ObservableObject {
+  let updates: SoftwareUpdateService
   @Published private(set) var snapshot = WorkspaceSnapshot.empty
   @Published private(set) var focusRequestID = 0
   @Published private(set) var newTaskTitleFocusRequestID = 0
@@ -18,6 +19,16 @@ final class AppShellViewModel: ObservableObject {
     }
   }
   var onPanelSideChanged: ((PanelSide) -> Void)?
+  @Published private(set) var panelCustomization: PanelCustomization {
+    didSet {
+      guard oldValue != panelCustomization else { return }
+      userDefaults.set(panelCustomization.preset.rawValue, forKey: Self.panelSizePresetKey)
+      userDefaults.set(Double(panelCustomization.customWidth), forKey: Self.panelCustomWidthKey)
+      userDefaults.set(Double(panelCustomization.customHeight), forKey: Self.panelCustomHeightKey)
+      onPanelCustomizationChanged?(panelCustomization)
+    }
+  }
+  var onPanelCustomizationChanged: ((PanelCustomization) -> Void)?
   var onImagePreview: ((NoteAttachment) -> Void)?
   nonisolated let attachmentDirectory: URL
   private var captureTask: Task<Void, Never>?
@@ -25,7 +36,6 @@ final class AppShellViewModel: ObservableObject {
   private var pendingImages: [(id: UUID, data: [Data])] = []
   private var workspaceWrites: [UUID: Task<Void, Never>] = [:]
   @Published private(set) var isCreatingTask = false
-  @Published private(set) var isSelectingNewTaskEffort = false
   @Published var newTaskTitle = ""
   @Published var newTaskEffort: Effort?
   @Published var isSettingsPresented = false {
@@ -49,6 +59,10 @@ final class AppShellViewModel: ObservableObject {
     didSet {
       userDefaults.set(appearanceMode.rawValue, forKey: Self.appearanceModeKey)
     }
+  }
+  @Published private(set) var translucentBackgroundOverride: Bool?
+  var usesTranslucentBackground: Bool {
+    translucentBackgroundOverride ?? (appearanceMode != .standard)
   }
   @Published var mainTaskDensity: MainTaskDensity {
     didSet {
@@ -83,16 +97,27 @@ final class AppShellViewModel: ObservableObject {
 
   static let appearanceModeKey = "appearanceMode"
   static let panelSideKey = "panelSide"
+  static let panelSizePresetKey = "panelSizePreset"
+  static let panelCustomWidthKey = "panelCustomWidth"
+  static let panelCustomHeightKey = "panelCustomHeight"
+  static let translucentBackgroundKey = "translucentBackground"
   static let mainTaskDensityKey = "mainTaskDensity"
 
   init(
     repository: WorkspaceRepository,
     remindersSync: RemindersSyncCoordinator? = nil,
+    updates: SoftwareUpdateService? = nil,
     userDefaults: UserDefaults = .standard
   ) {
+    self.updates = updates ?? SoftwareUpdateService(defaults: userDefaults)
     self.repository = repository
     attachmentDirectory = repository.attachmentDirectory
     panelSide = PanelSide(rawValue: userDefaults.string(forKey: Self.panelSideKey) ?? "right") ?? .right
+    panelCustomization = PanelCustomization(
+      preset: PanelSizePreset(rawValue: userDefaults.string(forKey: Self.panelSizePresetKey) ?? "classic") ?? .classic,
+      customWidth: PanelCustomization.clampedWidth(CGFloat(userDefaults.object(forKey: Self.panelCustomWidthKey) as? Double ?? 480)),
+      customHeight: PanelCustomization.clampedHeight(CGFloat(userDefaults.object(forKey: Self.panelCustomHeightKey) as? Double ?? 720))
+    )
     self.userDefaults = userDefaults
     let sync =
       remindersSync
@@ -107,6 +132,7 @@ final class AppShellViewModel: ObservableObject {
       AppearanceMode(
         rawValue: userDefaults.string(forKey: Self.appearanceModeKey) ?? "standard"
       ) ?? .standard
+    translucentBackgroundOverride = userDefaults.object(forKey: Self.translucentBackgroundKey) as? Bool
     mainTaskDensity =
       MainTaskDensity(
         rawValue: userDefaults.string(forKey: Self.mainTaskDensityKey) ?? "compact"
@@ -119,6 +145,7 @@ final class AppShellViewModel: ObservableObject {
 
   func start() {
     guard observationTask == nil else { return }
+    updates.start()
     observationTask = Task { [weak self, repository] in
       do {
         try await repository.maintainAttachmentFiles()
@@ -135,6 +162,7 @@ final class AppShellViewModel: ObservableObject {
   }
 
   func stop() {
+    updates.stop()
     commitQuickNoteOnFocusLoss()
     observationTask?.cancel()
     observationTask = nil
@@ -169,6 +197,45 @@ final class AppShellViewModel: ObservableObject {
     }
   }
 
+  func selectPanelSize(_ preset: PanelSizePreset) {
+    var next = panelCustomization
+    next.select(preset)
+    panelCustomization = next
+  }
+
+  func setPanelWidth(_ width: CGFloat, preserving height: CGFloat) {
+    var next = panelCustomization
+    next.setWidth(width, preserving: height)
+    panelCustomization = next
+  }
+
+  func setPanelHeight(_ height: CGFloat, preserving width: CGFloat) {
+    var next = panelCustomization
+    next.setHeight(height, preserving: width)
+    panelCustomization = next
+  }
+
+  func setTranslucentBackground(_ enabled: Bool) {
+    translucentBackgroundOverride = enabled
+    userDefaults.set(enabled, forKey: Self.translucentBackgroundKey)
+  }
+
+  /// Manual app removal leaves the workspace and Reminders untouched.
+  func prepareForManualRemoval() -> Bool {
+    guard launchAtLoginService.status == .enabled || launchAtLoginService.status == .requiresApproval else {
+      return true
+    }
+    do {
+      try launchAtLoginService.setEnabled(false)
+      refreshLaunchAtLoginStatus()
+      return true
+    } catch {
+      errorMessage = "EasyFlow couldn't turn off Launch at Login. Please disable it in System Settings and try again."
+      refreshLaunchAtLoginStatus()
+      return false
+    }
+  }
+
   func requestQuickNoteFocus() {
     focusRequestID &+= 1
   }
@@ -184,7 +251,7 @@ final class AppShellViewModel: ObservableObject {
 
   func beginNewTaskCreation() {
     isCreatingTask = true
-    isSelectingNewTaskEffort = false
+    newTaskEffort = .one
     newTaskTitleFocusRequestID &+= 1
     InputDiagnostics.record("newTask creating=true focusRequest=\(newTaskTitleFocusRequestID)")
     registerInteraction()
@@ -192,30 +259,25 @@ final class AppShellViewModel: ObservableObject {
 
   func cancelNewTaskCreation() {
     isCreatingTask = false
-    isSelectingNewTaskEffort = false
     newTaskTitle = ""
     newTaskEffort = nil
     isSubmittingNewTask = false
     registerInteraction()
   }
 
-  func advanceNewTaskTitleEntry() {
-    guard isCreatingTask else { return }
-    guard !newTaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      return
-    }
-    isSelectingNewTaskEffort = true
-    registerInteraction()
-  }
-
   @discardableResult
   func selectNewTaskEffortFromKeyboard(_ rawValue: Int) -> Bool {
-    guard isCreatingTask, isSelectingNewTaskEffort, !isSubmittingNewTask,
+    guard isCreatingTask, !isSubmittingNewTask,
       let effort = Effort(rawValue: rawValue)
     else { return false }
     newTaskEffort = effort
-    createMainTask()
     return true
+  }
+
+  func moveNewTaskEffortSelection(by offset: Int) {
+    guard isCreatingTask, !isSubmittingNewTask else { return }
+    let current = newTaskEffort?.rawValue ?? (offset > 0 ? 0 : 5)
+    newTaskEffort = Effort(rawValue: min(4, max(1, current + offset)))
   }
 
   var onKeyboardSecondaryRequested: ((SecondaryPanelContext) -> Void)?
@@ -475,7 +537,6 @@ final class AppShellViewModel: ObservableObject {
         self?.newTaskTitle = ""
         self?.newTaskEffort = nil
         self?.isCreatingTask = false
-        self?.isSelectingNewTaskEffort = false
         self?.isSubmittingNewTask = false
       } catch {
         self?.isSubmittingNewTask = false

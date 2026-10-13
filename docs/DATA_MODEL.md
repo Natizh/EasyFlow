@@ -102,7 +102,9 @@ The generated display title is derived at presentation/domain level from the fir
 
 ## Settings
 
-`appSetting` stores the Reminders list mapping and internal reminder settings: enabled/disabled, interval preset, custom interval seconds, and optional paused-until timestamp. Missing reminder rows mean the default enabled 1-hour interval. UserDefaults stores appearance, Main Task density, and `panelSide` (`left` or `right`, default `right`). Launch at Login status comes from SMAppService. Panel/UI state remains local and does not synchronize through Reminders.
+`appSetting` stores the Reminders list mapping and internal reminder settings: enabled/disabled, interval preset, custom interval seconds, and optional paused-until timestamp. Missing reminder rows mean the default enabled 1-hour interval. UserDefaults stores appearance, Main Task density, `panelSide` (`left` or `right`, default `right`), panel size preset (default `classic`), retained Custom width/height point values, and an optional explicit Translucent background preference. Without an explicit preference, translucency follows the appearance mode. Launch at Login status comes from SMAppService. Panel/UI state remains local and does not synchronize through Reminders.
+
+Updater preferences in UserDefaults include automatic-check enablement (default true), last check, last automatic attempt, and a postponed version. The update channel and trusted public key belong to the installed app bundle, not the database. Downloads and temporary installer files are outside the workspace database and attachments. An app replacement must not migrate or reset user data as a recovery step.
 
 Plain text columns remain authoritative for previews, derived titles, and compatibility. Rich-text sidecar columns store formatting ranges only; missing or invalid sidecars load as plain text without data loss.
 

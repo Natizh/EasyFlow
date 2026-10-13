@@ -8,7 +8,9 @@ final class AppShellCoordinator {
 
   private var deactivationObserver: NSObjectProtocol?
   private var timerTasks: [PanelTimer: Task<Void, Never>] = [:]
+  private var timerGenerations: [PanelTimer: UInt64] = [:]
   private var reminderTimerTask: Task<Void, Never>?
+  private var activeSpaceRevision: UInt64 = 0
   private var layout: PanelLayout?
   private var lastPointerRegion: PointerRegion?
   private var settingsIsPresented = false
@@ -83,6 +85,12 @@ final class AppShellCoordinator {
       self.stateMachine = self.stateMachine.stabilized(auxiliaryIsPresented: self.settingsIsPresented)
       self.screenConfigurationChanged()
     }
+    panelPresenter.onPanelCustomizationChanged = { [weak self] _ in
+      guard let self else { return }
+      for timer in Array(self.timerTasks.keys) { self.cancel(timer: timer) }
+      self.stateMachine = self.stateMachine.stabilized(auxiliaryIsPresented: self.settingsIsPresented)
+      self.screenConfigurationChanged()
+    }
     panelPresenter.onPointerMoved = { [weak self] point in
       self?.pointerMoved(to: point)
     }
@@ -129,13 +137,20 @@ final class AppShellCoordinator {
   }
 
   private func activeSpaceChanged() {
+    FullscreenDiagnostics.spaceChanged()
+    activeSpaceRevision &+= 1
+    let revision = activeSpaceRevision
     lastPointerRegion = nil
     refreshLayout()
     process(.activeSpaceChanged)
-    // AppKit finishes assigning windows to the new Space on the next run-loop
-    // turn. Re-evaluate the pointer only after window ordering is reconciled.
+    // AppKit may finish assigning fullscreen Space membership on the next
+    // run-loop turn. Reassert the latest logical intent after that handoff.
     DispatchQueue.main.async { [weak self] in
-      self?.pointerMoved(to: NSEvent.mouseLocation)
+      guard let self, self.activeSpaceRevision == revision else { return }
+      self.refreshLayout()
+      self.process(.activeSpaceChanged)
+      self.lastPointerRegion = nil
+      self.pointerMoved(to: NSEvent.mouseLocation)
     }
   }
 
@@ -144,7 +159,12 @@ final class AppShellCoordinator {
       layout = nil
       return
     }
-    layout = PanelLayout(display: display, sizing: sizing, side: panelPresenter.panelSide)
+    layout = PanelLayout(
+      display: display,
+      sizing: sizing,
+      side: panelPresenter.panelSide,
+      customization: panelPresenter.panelCustomization
+    )
   }
 
   private func pointerMoved(to point: CGPoint) {
@@ -163,7 +183,11 @@ final class AppShellCoordinator {
   }
 
   private func process(_ event: PanelEvent) {
+    if event == .activationDwellElapsed { FullscreenDiagnostics.recordEvent("activation-dwell-elapsed") }
+    if event == .activeSpaceChanged { FullscreenDiagnostics.recordEvent("state-space-reconcile") }
+    if event == .pointerChanged(.activationEdge) { FullscreenDiagnostics.recordEvent("activation-edge-classified") }
     let commands = stateMachine.handle(event)
+    if commands.contains(.showMain) { FullscreenDiagnostics.recordEvent("state-show-main") }
     commands.forEach(execute)
   }
 
@@ -283,6 +307,7 @@ final class AppShellCoordinator {
 
   private func schedule(timer: PanelTimer, after delay: TimeInterval) {
     cancel(timer: timer)
+    let generation = timerGenerations[timer, default: 0]
     let nanoseconds = UInt64(max(0, delay) * 1_000_000_000)
 
     timerTasks[timer] = Task { @MainActor [weak self] in
@@ -291,7 +316,7 @@ final class AppShellCoordinator {
       } catch {
         return
       }
-      guard !Task.isCancelled else { return }
+      guard !Task.isCancelled, self?.timerGenerations[timer] == generation else { return }
       self?.timerTasks[timer] = nil
       self?.process(timer.elapsedEvent)
     }
@@ -300,6 +325,7 @@ final class AppShellCoordinator {
   private func cancel(timer: PanelTimer) {
     timerTasks[timer]?.cancel()
     timerTasks[timer] = nil
+    timerGenerations[timer, default: 0] &+= 1
   }
 }
 

@@ -49,7 +49,15 @@ final class ReminderBannerPanel: NSPanel {
 struct ReminderBannerView: View {
   let title: String
   let appearanceMode: AppearanceMode
+  let translucent: Bool
   let action: () -> Void
+
+  init(title: String, appearanceMode: AppearanceMode, translucent: Bool? = nil, action: @escaping () -> Void) {
+    self.title = title
+    self.appearanceMode = appearanceMode
+    self.translucent = translucent ?? (appearanceMode != .standard)
+    self.action = action
+  }
 
   var body: some View {
     Button(action: action) {
@@ -76,6 +84,6 @@ struct ReminderBannerView: View {
     }
     .buttonStyle(.plain)
     .accessibilityLabel(AccessibilityNames.reminderTask(title))
-    .easyFlowPanelSurface(appearanceMode)
+    .easyFlowPanelSurface(appearanceMode, translucent: translucent)
   }
 }

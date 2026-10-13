@@ -2,13 +2,14 @@ import SwiftUI
 
 struct EasyFlowPanelSurface: ViewModifier {
   let mode: AppearanceMode
+  let translucent: Bool
   @Environment(\.colorSchemeContrast) private var contrast
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
   @ViewBuilder
   func body(content: Content) -> some View {
     #if compiler(>=6.2)
-      if #available(macOS 26, *), mode == .liquidGlass, !reduceTransparency {
+      if #available(macOS 26, *), mode == .liquidGlass, translucent, !reduceTransparency {
         liquidGlass(content)
       } else {
         fallback(content)
@@ -41,8 +42,10 @@ struct EasyFlowPanelSurface: ViewModifier {
 
   @ViewBuilder
   private var backgroundStyle: some View {
-    if reduceTransparency || mode == .standard {
-      Color(nsColor: .windowBackgroundColor).opacity(0.97)
+    if reduceTransparency || !translucent {
+      Color(nsColor: .windowBackgroundColor)
+    } else if mode == .standard {
+      Rectangle().fill(.regularMaterial)
     } else {
       Rectangle().fill(.ultraThinMaterial)
     }
@@ -59,8 +62,8 @@ struct EasyFlowPanelSurface: ViewModifier {
 }
 
 extension View {
-  func easyFlowPanelSurface(_ mode: AppearanceMode) -> some View {
-    modifier(EasyFlowPanelSurface(mode: mode))
+  func easyFlowPanelSurface(_ mode: AppearanceMode, translucent: Bool) -> some View {
+    modifier(EasyFlowPanelSurface(mode: mode, translucent: translucent))
   }
 }
 

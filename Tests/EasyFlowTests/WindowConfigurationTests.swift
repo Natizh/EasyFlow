@@ -13,9 +13,10 @@ struct WindowConfigurationTests {
     #expect(panel.level == .statusBar)
     #expect(panel.canBecomeKey)
     #expect(!panel.canBecomeMain)
+    #expect(panel.styleMask.contains(.nonactivatingPanel))
     #expect(panel.collectionBehavior.contains(.canJoinAllSpaces))
     #expect(panel.collectionBehavior.contains(.fullScreenAuxiliary))
-    #expect(panel.collectionBehavior.contains(.stationary))
+    #expect(!panel.collectionBehavior.contains(.stationary))
     #expect(panel.collectionBehavior.contains(.ignoresCycle))
     #expect(!panel.hidesOnDeactivate)
     #expect(!panel.isOpaque)
@@ -44,6 +45,13 @@ struct WindowConfigurationTests {
     #expect(overlay.collectionBehavior == EasyFlowOverlayWindowConfiguration.collectionBehavior)
     #expect(activation.collectionBehavior == overlay.collectionBehavior)
     #expect(reminder.collectionBehavior == overlay.collectionBehavior)
+  }
+
+  @Test("Only ordered windows missing from the active Space are rehomed")
+  func activeSpaceRecoveryPolicy() {
+    #expect(WindowSpaceRecoveryPolicy.needsRehome(isVisible: true, isOnActiveSpace: false))
+    #expect(!WindowSpaceRecoveryPolicy.needsRehome(isVisible: true, isOnActiveSpace: true))
+    #expect(!WindowSpaceRecoveryPolicy.needsRehome(isVisible: false, isOnActiveSpace: false))
   }
 
   @Test("Rounded content masking clips both panel hosting surfaces")
@@ -81,5 +89,18 @@ struct WindowConfigurationTests {
       PanelPresentationCoordinator.secondaryCloseAnimationDuration
         > PanelPresentationCoordinator.secondaryOpenAnimationDuration
     )
+  }
+
+  @Test("Superseded animation completions cannot authorize old window writes")
+  func staleAnimationRevision() {
+    var revision = PanelAnimationRevision()
+    revision.advance()
+    let opening = revision.value
+    revision.advance()
+    let closing = revision.value
+    #expect(!revision.accepts(opening))
+    #expect(revision.accepts(closing))
+    revision.advance()
+    #expect(!revision.accepts(closing))
   }
 }

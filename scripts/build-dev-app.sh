@@ -3,9 +3,13 @@ set -euo pipefail
 
 repository_root="${0:A:h:h}"
 configuration="${1:-debug}"
+swiftpm_flags=()
+if [[ "${EASYFLOW_SWIFTPM_DISABLE_SANDBOX:-0}" == "1" ]]; then
+  swiftpm_flags+=(--disable-sandbox)
+fi
 print -r -- "Building EasyFlow ($configuration)..."
-(cd "$repository_root" && swift build -c "$configuration")
-binary_directory="$(cd "$repository_root" && swift build -c "$configuration" --show-bin-path)"
+(cd "$repository_root" && swift build -c "$configuration" "${swiftpm_flags[@]}")
+binary_directory="$(cd "$repository_root" && swift build -c "$configuration" "${swiftpm_flags[@]}" --show-bin-path)"
 app_bundle="${EASYFLOW_APP_OUTPUT:-$repository_root/.build/dev/EasyFlow.app}"
 
 rm -rf "$app_bundle"

@@ -64,6 +64,13 @@ final class EasyFlowAppDelegate: NSObject, NSApplicationDelegate {
 enum EasyFlowMain {
   @MainActor
   static func main() {
+    if CommandLine.arguments.count == 3,
+      CommandLine.arguments[1] == "--easyflow-install-update" {
+      let result = UpdateInstaller.runHelper(
+        requestURL: URL(fileURLWithPath: CommandLine.arguments[2])
+      )
+      exit(result)
+    }
     let application = NSApplication.shared
     let delegate = EasyFlowAppDelegate()
 

@@ -4,7 +4,6 @@ enum EasyFlowOverlayWindowConfiguration {
   static let collectionBehavior: NSWindow.CollectionBehavior = [
     .canJoinAllSpaces,
     .fullScreenAuxiliary,
-    .stationary,
     .ignoresCycle,
   ]
 
@@ -14,6 +13,12 @@ enum EasyFlowOverlayWindowConfiguration {
     view.layer?.cornerRadius = 22
     view.layer?.cornerCurve = .continuous
     view.layer?.masksToBounds = true
+  }
+}
+
+enum WindowSpaceRecoveryPolicy {
+  static func needsRehome(isVisible: Bool, isOnActiveSpace: Bool) -> Bool {
+    isVisible && !isOnActiveSpace
   }
 }
 

@@ -25,6 +25,13 @@ struct FocusRestorationSession: Equatable, Sendable {
   }
 }
 
+struct PanelAnimationRevision: Equatable, Sendable {
+  private(set) var value = 0
+
+  mutating func advance() { value &+= 1 }
+  func accepts(_ token: Int) -> Bool { value == token }
+}
+
 @MainActor
 final class PanelPresentationCoordinator {
   var onPointerNavigation: (() -> Void)?
@@ -38,15 +45,18 @@ final class PanelPresentationCoordinator {
   var onSecondaryCleared: (() -> Void)?
   var onSettingsPresentationChanged: ((Bool) -> Void)?
   var onPanelSideChanged: ((PanelSide) -> Void)?
+  var onPanelCustomizationChanged: ((PanelCustomization) -> Void)?
   var onReminderBannerClicked: ((UUID) -> Bool)?
   var onWorkspaceSnapshotChanged: ((WorkspaceSnapshot) -> Void)?
   var panelSide: PanelSide { viewModel.panelSide }
+  var panelCustomization: PanelCustomization { viewModel.panelCustomization }
   private var settingsController: SettingsWindowController!
   private let previewController = ImagePreviewWindowController()
   private weak var auxiliaryOrigin: NSWindow?
   private var keyboardNavigationIsActive = false
-  private var mainGeneration = 0
-  private var secondaryGeneration = 0
+  private var mainGeneration = PanelAnimationRevision()
+  private var secondaryGeneration = PanelAnimationRevision()
+  private var desiredPresentation: PanelSpacePresentation = .hidden
 
   private let activationPanel = ActivationEdgePanel()
   private let mainPanel = OverlayPanel()
@@ -55,6 +65,7 @@ final class PanelPresentationCoordinator {
   private let viewModel: AppShellViewModel
   private var previousApplication: NSRunningApplication?
   private var focusRestorationSession = FocusRestorationSession()
+  private var pendingFocusRestoration: Bool?
 
   private let activationTrackingView = PointerTrackingView()
   private let mainHostingView: PointerTrackingHostingView<MainPanelView>
@@ -116,6 +127,9 @@ final class PanelPresentationCoordinator {
       self.onWorkspaceSnapshotChanged?(snapshot)
     }
     viewModel.onPanelSideChanged = { [weak self] side in self?.onPanelSideChanged?(side) }
+    viewModel.onPanelCustomizationChanged = { [weak self] customization in
+      self?.onPanelCustomizationChanged?(customization)
+    }
     viewModel.onImagePreview = { [weak self] attachment in self?.preview(attachment) }
     viewModel.onTaskRowsChanged = { [weak mainHostingView] rows in
       mainHostingView?.updateTaskRows(rows)
@@ -138,6 +152,9 @@ final class PanelPresentationCoordinator {
 
     activationTrackingView.onPointerMoved = { [weak self] point in
       self?.onPointerMoved?(point)
+    }
+    activationTrackingView.onPointerEntered = { [weak self] in
+      self?.diagnose("activation-edge-mouse-entered")
     }
     mainHostingView.onPointerMoved = { [weak self] point in
       self?.onPointerMoved?(point)
@@ -221,6 +238,7 @@ final class PanelPresentationCoordinator {
     viewModel.start()
     apply(layout: layout)
     activationPanel.orderFrontRegardless()
+    diagnose("startup")
   }
 
   func stop() {
@@ -234,21 +252,29 @@ final class PanelPresentationCoordinator {
 
   func apply(layout: PanelLayout) {
     currentLayout = layout
-    mainGeneration += 1
-    secondaryGeneration += 1
+    mainGeneration.advance()
+    secondaryGeneration.advance()
+    prepareForSupersedingAnimation(on: mainPanel)
+    prepareForSupersedingAnimation(on: secondaryPanel)
     mainHostingView.resetRouting(side: layout.side)
     secondaryHostingView.resetRouting(side: layout.side)
     activationPanel.setFrame(layout.activationFrame, display: true)
+    rehomeIfOffActiveSpace(activationPanel)
     if !activationPanel.isVisible {
       activationPanel.orderFrontRegardless()
     }
-    mainPanel.alphaValue = 1
-    secondaryPanel.alphaValue = 1
-    mainPanel.setFrame(layout.mainFrame, display: mainPanel.isVisible)
-    secondaryPanel.setFrame(
-      layout.secondaryFrame,
-      display: secondaryPanel.isVisible
-    )
+    settlePresentation()
+    if reminderBannerPanel.isVisible {
+      reminderBannerPanel.setFrame(reminderBannerFrame(layout: layout), display: true)
+      reminderBannerPanel.orderFrontRegardless()
+    }
+    if settingsController.window?.isVisible == true {
+      settingsController.window?.orderFrontRegardless()
+    }
+    if previewController.window?.isVisible == true {
+      previewController.window?.orderFrontRegardless()
+    }
+    diagnose("layout-applied")
   }
 
   func reconcileActiveSpace(
@@ -258,15 +284,17 @@ final class PanelPresentationCoordinator {
     keyboardNavigationIsActive = false
     focusRestorationSession.activeSpaceChanged()
     previousApplication = nil
-    mainGeneration += 1
-    secondaryGeneration += 1
+    mainGeneration.advance()
+    secondaryGeneration.advance()
     prepareForSupersedingAnimation(on: mainPanel)
     prepareForSupersedingAnimation(on: secondaryPanel)
     currentLayout = layout
+    desiredPresentation = presentation
     mainHostingView.resetRouting(side: layout.side)
     secondaryHostingView.resetRouting(side: layout.side)
 
     activationPanel.setFrame(layout.activationFrame, display: true)
+    rehomeIfOffActiveSpace(activationPanel)
     activationPanel.orderFrontRegardless()
 
     // Keep native responder/selection on a visible current-Space surface. Never
@@ -275,36 +303,7 @@ final class PanelPresentationCoordinator {
       if !panel.isOnActiveSpace { panel.retireFromInteraction() }
       panel.recalculateKeyViewLoop()
     }
-    switch presentation {
-    case .hidden:
-      secondaryPanel.retireFromInteraction()
-      secondaryPanel.orderOut(nil)
-      mainPanel.retireFromInteraction()
-      mainPanel.orderOut(nil)
-      mainPanel.alphaValue = 1
-      secondaryPanel.alphaValue = 1
-      viewModel.secondaryContext = nil
-    case .main:
-      secondaryPanel.retireFromInteraction()
-      secondaryPanel.orderOut(nil)
-      secondaryPanel.alphaValue = 1
-      viewModel.secondaryContext = nil
-      mainPanel.setFrame(layout.mainFrame, display: true)
-      mainPanel.alphaValue = 1
-      mainPanel.exposeForInteraction()
-      mainPanel.orderFrontRegardless()
-    case .mainAndSecondary(let context):
-      viewModel.secondaryContext = context
-      mainPanel.setFrame(layout.mainFrame, display: true)
-      secondaryPanel.setFrame(layout.secondaryFrame, display: true)
-      mainPanel.alphaValue = 1
-      secondaryPanel.alphaValue = 1
-      mainPanel.exposeForInteraction()
-      mainPanel.orderFrontRegardless()
-      secondaryPanel.exposeForInteraction()
-      secondaryPanel.orderFrontRegardless()
-      secondaryPanel.order(.above, relativeTo: mainPanel.windowNumber)
-    }
+    settlePresentation()
 
     if reminderBannerPanel.isVisible {
       reminderBannerPanel.orderFrontRegardless()
@@ -315,8 +314,11 @@ final class PanelPresentationCoordinator {
     if previewController.window?.isVisible == true {
       previewController.window?.orderFrontRegardless()
     }
+    diagnose("space-reconciled")
+    let notificationGeneration = mainGeneration.value
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
+      guard self.mainGeneration.accepts(notificationGeneration) else { return }
       for panel in [self.mainPanel, self.secondaryPanel] {
         if panel.isAvailableForFocus {
           NSAccessibility.post(element: panel, notification: .layoutChanged)
@@ -328,7 +330,9 @@ final class PanelPresentationCoordinator {
   }
 
   func showMain(layout: PanelLayout) {
-    mainGeneration += 1
+    if case .hidden = desiredPresentation { desiredPresentation = .main }
+    pendingFocusRestoration = nil
+    mainGeneration.advance()
     prepareForSupersedingAnimation(on: mainPanel)
     currentLayout = layout
     activationPanel.setFrame(layout.activationFrame, display: true)
@@ -338,7 +342,9 @@ final class PanelPresentationCoordinator {
       capturePreviousApplication()
       focusRestorationSession.begin()
     }
-    NSApplication.shared.activate(ignoringOtherApps: true)
+    // The panel is nonactivating: ordering it from the current fullscreen
+    // Space must not activate EasyFlow's ordinary Desktop Space first.
+    rehomeIfOffActiveSpace(mainPanel)
     if !wasVisible {
       mainPanel.setFrame(layout.mainHiddenFrame, display: false)
       mainPanel.alphaValue = 0
@@ -346,24 +352,59 @@ final class PanelPresentationCoordinator {
     mainPanel.exposeForInteraction()
     mainPanel.orderFrontRegardless()
     mainPanel.makeKey()
+    diagnose("main-ordered")
+    let observedGeneration = mainGeneration.value
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.mainGeneration.accepts(observedGeneration) else { return }
+      self.diagnose("main-next-turn")
+    }
+    if wasVisible {
+      // A visible window can still be mid-close, transparent, or off its anchor.
+      mainPanel.setFrame(layout.mainFrame, display: true)
+      mainPanel.alphaValue = 1
+      return
+    }
+    let generation = mainGeneration.value
     animate(duration: 0.22) {
       self.mainPanel.animator().setFrame(layout.mainFrame, display: true)
       self.mainPanel.animator().alphaValue = 1
+    } completion: {
+      guard self.mainGeneration.accepts(generation) else {
+        self.settlePresentation()
+        return
+      }
+      self.settlePresentation()
     }
   }
 
   func focusQuickNote() {
-    guard mainPanel.isAvailableForFocus else { return }
-    mainPanel.makeKey()
-    DispatchQueue.main.async { [weak viewModel] in
-      viewModel?.requestQuickNoteFocus()
+    let generation = mainGeneration.value
+    DispatchQueue.main.async { [weak self] in
+      guard let self, self.mainGeneration.accepts(generation),
+        self.mainPanel.isAvailableForFocus else { return }
+      self.mainPanel.makeKey()
+      self.viewModel.requestQuickNoteFocus()
     }
   }
 
   func showSecondary(context: SecondaryPanelContext, layout: PanelLayout) {
-    secondaryGeneration += 1
+    // Main is authoritative even if a caller omitted showMain or AppKit lost
+    // its current-Space window while the logical state remained visible.
+    let mainRequiresRepair = CoordinatedPanelTarget(
+      presentation: .mainAndSecondary(context), layout: layout
+    ).mainNeedsRepair(observation(of: mainPanel))
+    if case .hidden = desiredPresentation {
+      showMain(layout: layout)
+    } else if mainRequiresRepair {
+      showMain(layout: layout)
+    }
+    desiredPresentation = .mainAndSecondary(context)
+    currentLayout = layout
+    ensureMainPresented(layout: layout)
+    secondaryGeneration.advance()
     prepareForSupersedingAnimation(on: secondaryPanel)
-    let generation = secondaryGeneration
+    rehomeIfOffActiveSpace(secondaryPanel)
+    let generation = secondaryGeneration.value
     viewModel.secondaryContext = context
     secondaryPanel.exposeForInteraction()
     currentLayout = layout
@@ -377,6 +418,7 @@ final class PanelPresentationCoordinator {
       secondaryPanel.setFrame(layout.secondaryFrame, display: true)
       secondaryPanel.orderFrontRegardless()
       secondaryPanel.order(.above, relativeTo: mainPanel.windowNumber)
+      diagnose("secondary-reordered")
       return
     }
     secondaryPanel.setFrame(intent.startFrame, display: false)
@@ -384,11 +426,15 @@ final class PanelPresentationCoordinator {
     mainPanel.orderFrontRegardless()
     secondaryPanel.orderFrontRegardless()
     secondaryPanel.order(.above, relativeTo: mainPanel.windowNumber)
+    diagnose("secondary-ordered")
     animate(duration: Self.secondaryOpenAnimationDuration) {
       self.secondaryPanel.animator().setFrame(intent.targetFrame, display: true)
       self.secondaryPanel.animator().alphaValue = intent.targetAlpha
     } completion: {
-      guard self.secondaryGeneration == generation else { return }
+      guard self.secondaryGeneration.accepts(generation) else {
+        self.settlePresentation()
+        return
+      }
       self.secondaryPanel.setFrame(intent.targetFrame, display: true)
       self.secondaryPanel.alphaValue = intent.targetAlpha
       self.secondaryPanel.order(.above, relativeTo: self.mainPanel.windowNumber)
@@ -403,15 +449,18 @@ final class PanelPresentationCoordinator {
   }
 
   func hideSecondary() {
-    secondaryGeneration += 1
+    desiredPresentation = .main
+    if let currentLayout { ensureMainPresented(layout: currentLayout) }
+    secondaryGeneration.advance()
     prepareForSupersedingAnimation(on: secondaryPanel)
-    let generation = secondaryGeneration
+    let generation = secondaryGeneration.value
     NotificationCenter.default.post(name: .easyFlowFlushEditors, object: nil)
     let hadFocus = secondaryPanel.isKeyWindow
     secondaryPanel.retireFromInteraction()
     if hadFocus, mainPanel.isAvailableForFocus { mainPanel.makeKey() }
     guard secondaryPanel.isVisible, let currentLayout else {
       viewModel.secondaryContext = nil
+      settlePresentation()
       return
     }
     animate(duration: Self.secondaryCloseAnimationDuration) {
@@ -421,19 +470,25 @@ final class PanelPresentationCoordinator {
       )
       self.secondaryPanel.animator().alphaValue = 0
     } completion: {
-      guard self.secondaryGeneration == generation else { return }
+      guard self.secondaryGeneration.accepts(generation) else {
+        self.settlePresentation()
+        return
+      }
       self.secondaryPanel.orderOut(nil)
       self.viewModel.secondaryContext = nil
+      self.settlePresentation()
     }
   }
 
   func hideAll(restoreFocus: Bool) {
+    desiredPresentation = .hidden
+    pendingFocusRestoration = restoreFocus
     keyboardNavigationIsActive = false
-    mainGeneration += 1
-    secondaryGeneration += 1
+    mainGeneration.advance()
+    secondaryGeneration.advance()
     prepareForSupersedingAnimation(on: mainPanel)
     prepareForSupersedingAnimation(on: secondaryPanel)
-    let generation = mainGeneration
+    let generation = mainGeneration.value
     NotificationCenter.default.post(name: .easyFlowFlushEditors, object: nil)
     viewModel.commitQuickNoteOnFocusLoss()
     secondaryPanel.retireFromInteraction()
@@ -441,20 +496,19 @@ final class PanelPresentationCoordinator {
     secondaryPanel.orderOut(nil)
     viewModel.secondaryContext = nil
     guard mainPanel.isVisible, let currentLayout else {
-      if restoreFocus { restorePreviousApplication() } else { discardPreviousApplication() }
+      finishFocusAfterHiding()
       return
     }
     animate(duration: 0.18) {
       self.mainPanel.animator().setFrame(currentLayout.mainHiddenFrame, display: true)
       self.mainPanel.animator().alphaValue = 0
     } completion: {
-      guard self.mainGeneration == generation else { return }
-      self.mainPanel.orderOut(nil)
-      if restoreFocus {
-        self.restorePreviousApplication()
-      } else {
-        self.discardPreviousApplication()
+      guard self.mainGeneration.accepts(generation) else {
+        self.settlePresentation()
+        return
       }
+      self.mainPanel.orderOut(nil)
+      self.finishFocusAfterHiding()
     }
   }
 
@@ -467,6 +521,7 @@ final class PanelPresentationCoordinator {
       rootView: ReminderBannerView(
         title: task.title,
         appearanceMode: viewModel.appearanceMode,
+        translucent: viewModel.usesTranslucentBackground,
         action: { [weak self] in self?.clickReminderBanner() }
       )
     )
@@ -541,6 +596,12 @@ final class PanelPresentationCoordinator {
   private func discardPreviousApplication() {
     previousApplication = nil
     _ = focusRestorationSession.end(restoreRequested: false)
+  }
+
+  private func finishFocusAfterHiding() {
+    guard let restore = pendingFocusRestoration else { return }
+    pendingFocusRestoration = nil
+    if restore { restorePreviousApplication() } else { discardPreviousApplication() }
   }
 
   func prepareToTerminate() async -> Bool {
@@ -650,6 +711,71 @@ final class PanelPresentationCoordinator {
     // this only clears hosted-view layer animations before the next explicit
     // frame/alpha write starts a superseding transition.
     window.contentView?.layer?.removeAllAnimations()
+  }
+
+  private func ensureMainPresented(layout: PanelLayout) {
+    rehomeIfOffActiveSpace(mainPanel)
+    mainPanel.setFrame(layout.mainFrame, display: true)
+    mainPanel.alphaValue = 1
+    mainPanel.exposeForInteraction()
+    mainPanel.orderFrontRegardless()
+  }
+
+  private func rehomeIfOffActiveSpace(_ window: NSWindow) {
+    if WindowSpaceRecoveryPolicy.needsRehome(
+      isVisible: window.isVisible, isOnActiveSpace: window.isOnActiveSpace
+    ) {
+      diagnose("rehome-off-active-space")
+      window.orderOut(nil)
+    }
+  }
+
+  private func diagnose(_ stage: String) {
+    FullscreenDiagnostics.recordWindows(
+      stage, activation: activationPanel, main: mainPanel, secondary: secondaryPanel
+    )
+  }
+
+  private func observation(of panel: OverlayPanel) -> PanelWindowObservation {
+    PanelWindowObservation(
+      isVisible: panel.isVisible,
+      isOnActiveSpace: panel.isOnActiveSpace,
+      frame: panel.frame,
+      alpha: panel.alphaValue,
+      isClosing: panel.isClosing
+    )
+  }
+
+  /// Reassert the latest paired window intent after layout/Space changes and
+  /// after superseded AppKit animation completions. Never infer intent from
+  /// isVisible: a window can be ordered on another Space or still animating.
+  private func settlePresentation() {
+    guard let layout = currentLayout else { return }
+    let target = CoordinatedPanelTarget(presentation: desiredPresentation, layout: layout)
+    assert(!target.secondaryIsRequired || target.mainIsRequired)
+    switch desiredPresentation {
+    case .hidden:
+      secondaryPanel.retireFromInteraction()
+      secondaryPanel.orderOut(nil)
+      mainPanel.retireFromInteraction()
+      mainPanel.orderOut(nil)
+      viewModel.secondaryContext = nil
+      finishFocusAfterHiding()
+    case .main:
+      secondaryPanel.retireFromInteraction()
+      secondaryPanel.orderOut(nil)
+      viewModel.secondaryContext = nil
+      ensureMainPresented(layout: layout)
+    case .mainAndSecondary(let context):
+      viewModel.secondaryContext = context
+      ensureMainPresented(layout: layout)
+      rehomeIfOffActiveSpace(secondaryPanel)
+      secondaryPanel.setFrame(layout.secondaryFrame, display: true)
+      secondaryPanel.alphaValue = 1
+      secondaryPanel.exposeForInteraction()
+      secondaryPanel.orderFrontRegardless()
+      secondaryPanel.order(.above, relativeTo: mainPanel.windowNumber)
+    }
   }
 
   private static func contextLabel(_ context: SecondaryPanelContext) -> String {
