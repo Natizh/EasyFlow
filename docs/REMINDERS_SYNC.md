@@ -1,5 +1,7 @@
 # Apple Reminders Synchronization
 
+[Documentation](README.md) · [Product specification](../PRODUCT_SPEC.md) · [Contributor guide](../CONTRIBUTING.md)
+
 ## Boundary
 
 Apple Reminders/iCloud is EasyFlow's only cross-device synchronization infrastructure in v1. EasyFlow uses one dedicated Reminders list named `EasyFlow`. EventKit list/calendar APIs are the integration boundary; Reminders folders/groups are irrelevant, although the user may place the list in a folder manually.

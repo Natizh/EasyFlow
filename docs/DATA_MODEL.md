@@ -1,5 +1,7 @@
 # Data Model
 
+[Documentation](README.md) · [Product specification](../PRODUCT_SPEC.md) · [Contributor guide](../CONTRIBUTING.md)
+
 ## Principles
 
 - SQLite with GRDB is the selected local store.
@@ -14,19 +16,15 @@ The schema uses five additive/versioned migrations: `v1-local-workspace`, `v2-re
 
 ## Conceptual relationships
 
-```text
-MainTask
-  ├─ 0...n Steps
-  └─ 0...n Notes in attached state
-
-Note
-  ├─ inbox
-  ├─ attached to one MainTask
-  └─ soft-deleted
-
-AppSetting
-  └─ local application preferences/state
+```mermaid
+erDiagram
+    MainTask ||--o{ Step : contains
+    MainTask o|--o{ Note : owns
+    Note o|--o{ Attachment : contains
+    QuickNoteDraft o|--o{ Attachment : stages
 ```
+
+An active Note with no Main Task is in the inbox; one with a parent is attached. `deletedAt` separately marks soft deletion. Each attachment belongs to exactly one saved note or capture draft. Local application settings have no task ownership relationship.
 
 Task and Step style metadata may be embedded in their records or normalized if implementation evidence favors it. Product semantics remain text color, highlight, and underline only.
 

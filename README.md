@@ -1,16 +1,92 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/easyflow-hero-dark.webp">
-    <source media="(prefers-color-scheme: light)" srcset="assets/brand/easyflow-hero-light.webp">
-    <img src="assets/brand/easyflow-hero-light.webp" alt="EasyFlow — Your current work, one movement away.">
-  </picture>
+  <img src="assets/brand/easyflow-mark.png" width="80" height="80" alt="EasyFlow app mark">
 </p>
 
+<h1 align="center">EasyFlow</h1>
+<p align="center"><strong>Your current work, one movement away.</strong></p>
+<p align="center">A native macOS edge workspace for quick notes, active tasks, and the context behind them.</p>
+
 <p align="center">
-  <a href="https://natizh.github.io/easyflow/"><strong>Website</strong></a>
-  ·
-  <a href="https://github.com/Natizh/easyflow/releases/latest">Download the latest release</a>
+  <a href="https://github.com/Natizh/EasyFlow/releases/latest"><strong>Download for macOS</strong></a> ·
+  <a href="https://natizh.github.io/EasyFlow/">Website</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="#a-note-from-the-creator">A note from the creator</a>
 </p>
+<p align="center">macOS 14+ · Free and open source · MIT licensed · No EasyFlow account</p>
+
+![Illustration of EasyFlow’s Main Panel on the right and contextual task details immediately inward, with example notes and tasks.](assets/brand/easyflow-workspace.svg)
+<p align="center"><sub>Workspace illustration with example content; not an app screenshot. Right-side layout shown; Left is also available.</sub></p>
+
+EasyFlow keeps the small, active layer of your work close to the app you are already using. Hold the pointer briefly at your chosen outer desktop edge to reveal it. Capture a thought, check the next task, or open its details, then return to your work.
+
+It runs without a Dock icon or menu-bar item. The workspace overlays your current app, including fullscreen apps, without resizing it.
+
+## Why EasyFlow
+
+| When you need to… | EasyFlow helps you… |
+| --- | --- |
+| Save a thought before it disappears | Type a Quick Note and press Return; paste screenshots or images alongside the text. |
+| See what comes next | Drag Main Tasks into priority order. Estimate effort separately, from 1 to 4. |
+| Keep context beside a task | Open its Description, one-level Steps, and Attached Notes in the inward panel. |
+| Organize a captured note | Drag it onto a task to move the same note, including its images, into Attached Notes. |
+| Return to unfinished work | Use optional internal reminder banners with frequency, pause, and per-task controls. |
+| Make the workspace feel at home | Choose Left or Right, panel dimensions, row density, and native appearance. |
+
+Standard and Frosted appearances work on macOS 14+. Optional Liquid Glass requires macOS 26.
+
+## Install
+
+1. Download **EasyFlow.zip** from the [latest release](https://github.com/Natizh/EasyFlow/releases/latest).
+2. Extract it and move **EasyFlow.app** to **Applications**.
+3. Open EasyFlow. Allow Reminders access if you want Main Task synchronization; the local workspace also works without it.
+4. Reveal the workspace at the rightmost outer desktop edge. Open the Settings gear to change sides or enable **Launch at Login**.
+
+**First launch:** the community app is ad-hoc signed and is not Apple Developer ID signed or notarized. If macOS blocks it, use **System Settings → Privacy & Security → Open Anyway** for EasyFlow, then confirm the prompt. See the [installation guide](docs/INSTALLATION.md#first-launch-and-macos-security) for the full steps.
+
+**Updates:** v1.5.0 introduced signed in-app updates. Install that release or a newer public build manually first; subsequent verified releases can be installed from Settings. Update signing is separate from Apple notarization.
+
+[Installation, updates, and removal](docs/INSTALLATION.md) · [Build from source](CONTRIBUTING.md#build-and-run)
+
+## Your first minute
+
+1. **Capture:** reveal EasyFlow, type a Quick Note, and press Return. The composer clears for your next thought.
+2. **Choose:** select **New Task**, enter a title, and press Return. Effort starts at 1; choose 2–4 first if needed.
+3. **Break it down:** hover or open the task to edit its Description, add Steps, and keep notes beside it.
+4. **Organize:** drag tasks and Steps into order; drag a Quick Note onto a task to attach it.
+5. **Finish:** check a Step to keep it visible in place, or complete a Main Task to move it into Recently Completed.
+
+Recently Completed shows the five latest completions. **There is currently no restore or uncomplete action.**
+
+The [user guide](docs/USER_GUIDE.md) covers keyboard controls, images, reminders, panel settings, and daily workflows.
+
+## Local workspace, focused sync
+
+EasyFlow uses one dedicated **EasyFlow** list in Apple Reminders. After permission is granted, it creates that list if needed or reuses an unambiguous writable match.
+
+| Synchronized through Apple Reminders | Stored locally by EasyFlow |
+| --- | --- |
+| Main Task title | Task order and effort |
+| Main Task completion | Descriptions, Steps, and Step state |
+| Main Task creation and deletion | Quick Notes, Attached Notes, and images |
+| | Formatting, panel preferences, and internal reminder settings |
+
+The Main Task core can reach your other devices through Apple Reminders when its list is in a syncing account. The rest of the workspace stays on this Mac; Reminders is not a backup of those local details.
+
+EasyFlow has no account system, custom backend, telemetry, or analytics. Public builds contact GitHub to check for and download app updates; automatic checks can be disabled in Settings. [Sync and data details](docs/REMINDERS_SYNC.md) · [Update verification](docs/UPDATES.md)
+
+## Documentation
+
+Start with the [documentation index](docs/README.md) for the full reading map.
+
+| For | Read |
+| --- | --- |
+| Installing or updating | [Installation](docs/INSTALLATION.md) |
+| Using the workspace | [User guide](docs/USER_GUIDE.md) |
+| Fixing a problem | [Troubleshooting](docs/TROUBLESHOOTING.md) |
+| Building or contributing | [Contributor guide](CONTRIBUTING.md) |
+| Understanding the product | [Product specification](PRODUCT_SPEC.md) and [UX behavior](docs/UX_BEHAVIOR.md) |
+| Understanding the implementation | [Architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md), and [Reminders sync](docs/REMINDERS_SYNC.md) |
+| Reviewing releases | [Release notes](docs/releases/README.md) and [signed updates](docs/UPDATES.md) |
 
 ## A note from the creator
 
@@ -21,100 +97,6 @@ I did not personally write the implementation code. My contribution was defining
 This project is also an honest experiment about the period we are living through. For a product like this, being able to define a problem clearly, communicate with AI, evaluate its output, identify mistakes, and keep iterating was more useful to me than already knowing how to write every line of code myself. That does not make software engineering unimportant; it shows that the ability to direct AI effectively is becoming a real and increasingly important way to build software.
 
 I am not selling EasyFlow, and I do not want to hide or apologize for the fact that it was built with AI. I made it to practice this new way of creating, to keep training my ability to work with AI, and because EasyFlow is genuinely useful to me every day. If it can also be useful to somebody else, even better.
-
-EasyFlow is a native macOS edge workspace for keeping quick notes and the tasks you are actively working on close at hand. Move the pointer to the selected outer desktop edge (Right by default) and the workspace slides over the current app; move away and it gets out of the way.
-
-## Install
-
-### Download the app
-
-EasyFlow releases are distributed through [GitHub Releases](https://github.com/Natizh/easyflow/releases) as `EasyFlow.zip`.
-
-1. Open the Releases page and download `EasyFlow.zip` from the latest release.
-2. Double-click the ZIP to extract `EasyFlow.app`.
-3. Drag `EasyFlow.app` into your Applications folder.
-4. Open EasyFlow and allow Reminders access when macOS asks. EasyFlow automatically creates a dedicated `EasyFlow` list if one does not already exist, or reuses the existing one when it can do so unambiguously.
-5. If you want EasyFlow available after every login, enable **Launch at Login** in Settings.
-
-The current community release is ad-hoc signed, not signed with an Apple Developer ID and not notarized. macOS may therefore block the first launch. If that happens, Control-click `EasyFlow.app`, choose **Open**, then confirm. If macOS still blocks it, open **System Settings → Privacy & Security** and choose **Open Anyway** for EasyFlow. This override is only needed for the first launch of that build.
-
-The first release with signed in-app updates must be installed manually using these steps. After that trust bootstrap, public builds can check GitHub Releases in Settings and install newer releases whose artifacts pass EasyFlow's pinned Ed25519 signature checks. Local development builds cannot auto-install public releases.
-
-EasyFlow v1.5.0 is the first updater-enabled release. Its [release notes](docs/releases/v1.5.0.md) record the public-key fingerprint and the new fullscreen, panel customization, task-entry, and Settings changes.
-
-If the Releases page does not contain a build yet, use the source installation below.
-
-### Build and install from source
-
-You need macOS 14 or later and Apple's Swift command-line tools. Open Terminal, then copy and run:
-
-```sh
-git clone https://github.com/Natizh/easyflow.git
-cd easyflow
-./scripts/install.sh
-```
-
-The installer builds the release app, copies it to `/Applications` when possible (otherwise `~/Applications`), and opens it. If Apple's command-line tools are missing, the script tells you how to install them with `xcode-select --install`.
-
-## Use EasyFlow
-
-1. Launch EasyFlow. It runs without a Dock icon or menu-bar item.
-2. Move the pointer to the selected outer desktop edge (Right by default) and hold it there briefly.
-3. Type into Quick Notes. **Return** saves the note and readies the composer for the next one.
-4. Select **New Task**, enter a title, and press Return. Effort starts at 1; you can select 2–4 before creating the task.
-5. Hover a task to open its detail panel with Description, Steps, and Attached Notes.
-6. Drag Quick Notes onto tasks to move them into Attached Notes.
-7. Drag tasks, Quick Notes, and Steps directly to reorder them.
-8. Complete a task to move it into Recently Completed. EasyFlow shows the five most recent completed tasks; there is currently no restore action.
-9. Use the gear for centered Settings: Panel Side, panel size and surface, task reminder frequency and pause, appearance, Main Task row density, Reminders status, Software Updates, Launch at Login, and the running version.
-
-## Features
-
-- Left or Right edge activation, with Main on the outermost display and Secondary opening inward. Right is the default; changes apply immediately.
-- Rapid Quick Notes capture: Return saves the current note and immediately readies the next one, with direct drag/reorder.
-- Main Tasks with local effort, order, descriptions, Steps, styling, and Attached Notes.
-- Internal EasyFlow reminder banners for active Main Tasks, with frequency presets, pause controls, per-task exclusion, and click-to-open navigation.
-- Paste clipboard images or screenshots into Quick Notes and Attached Notes. Image-only notes and multiple images are supported, with compact thumbnails and a centered larger preview.
-- Quick Note → task movement preserves the same note, text, and images without copying or merging content.
-- Native Cut/Copy/Paste and selection; multiline editors support Command-B, Command-I, Command-U, and Control-Command-H for bold, italic, underline, and rounded text-marker highlighting.
-- Step title menus use the compact chevron action affordance while preserving drag behavior.
-- A contextual Secondary panel for task details and Quick Notes.
-- Five-item Recently Completed view.
-- Compact or Comfortable Main Task row density.
-- Apple Reminders synchronization for Main Task existence, title, and completion.
-- Standard and Frosted appearances on macOS 14+, with Liquid Glass available on macOS 26+.
-- Launch at Login through native macOS APIs.
-- Local SQLite metadata and image files in EasyFlow’s Application Support directory, with no EasyFlow account, backend, telemetry, or analytics.
-
-## Apple Reminders
-
-EasyFlow uses a dedicated `EasyFlow` list in Apple Reminders. On first authorized launch, EasyFlow automatically creates that list if needed; if exactly one suitable writable list with that name already exists, it reuses it instead of creating a duplicate.
-
-| Synced with Reminders | Kept local to EasyFlow |
-| --- | --- |
-| Main Task existence | Effort and order |
-| Main Task title | Description |
-| Main Task completion | Steps and Step state |
-|  | Quick Notes and Attached Notes |
-|  | Styling and EasyFlow-only UI state |
-
-EasyFlow does not encode its local-only metadata into Reminder notes, priority, or other Reminder fields.
-
-## Privacy
-
-EasyFlow has no account, custom backend, telemetry, or analytics. EasyFlow-specific workspace data stays on the Mac. EventKit is used only for the Apple Reminders synchronization boundary above.
-
-## Requirements
-
-For normal use, EasyFlow requires macOS 14 or later. Reminders permission is required only for Main Task synchronization; the local workspace remains usable if access is denied. Liquid Glass requires macOS 26.
-
-Building from source additionally requires Swift 6 through Xcode or the Xcode Command Line Tools.
-
-## Development
-
-Current behavior and implementation boundaries live in [PRODUCT_SPEC.md](PRODUCT_SPEC.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [DATA_MODEL.md](docs/DATA_MODEL.md), [UX_BEHAVIOR.md](docs/UX_BEHAVIOR.md), [REMINDERS_SYNC.md](docs/REMINDERS_SYNC.md), and [AGENTS.md](AGENTS.md).
-
-Run `swift build` and `swift test` before submitting changes. `./scripts/package-release.sh` creates a validated development-channel ZIP for CI and local inspection. Public updater releases require a separately prepared app and signed assets; publication is a manual, explicitly approved step. See [Signed GitHub updates](docs/UPDATES.md) for the key setup, packaging, validation, and release procedure. Pushing a tag alone does not publish a release.
 
 ## License
 

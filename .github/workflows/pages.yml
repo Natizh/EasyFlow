@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "website/**"
+      - "assets/brand/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -31,10 +32,18 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Stage website and shared brand assets
+        run: |
+          mkdir -p .build/website/assets/brand
+          cp website/index.html .build/website/index.html
+          cp -R assets/brand/. .build/website/assets/brand/
+          rm .build/website/assets/brand/README.md
+          touch .build/website/.nojekyll
+
       - name: Upload website
         uses: actions/upload-pages-artifact@v3
         with:
-          path: website
+          path: .build/website
 
       - name: Deploy to GitHub Pages
         id: deployment

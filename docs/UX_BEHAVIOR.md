@@ -1,5 +1,7 @@
 # UX Behavior
 
+[Documentation](README.md) · [Product specification](../PRODUCT_SPEC.md) · [Contributor guide](../CONTRIBUTING.md)
+
 This document defines interaction behavior and state transitions. Product scope belongs in `PRODUCT_SPEC.md`; platform structure belongs in `docs/ARCHITECTURE.md`.
 
 ## Interaction regions
