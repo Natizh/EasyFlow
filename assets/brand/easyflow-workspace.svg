@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="740" viewBox="0 0 1200 740" role="img" aria-labelledby="title desc">
+  <title id="title">EasyFlow edge workspace</title>
+  <desc id="desc">Illustration with sample content. The Main Panel sits on the right desktop edge with Quick Notes, Main Tasks ordered by priority, and Recently Completed. Immediately inward, the Secondary Panel shows a task's Description, Steps, and Attached Notes. Effort is shown separately as four dots.</desc>
+  <defs>
+    <linearGradient id="desktop" x2="1" y2="1"><stop stop-color="#141c35"/><stop offset="1" stop-color="#080e1e"/></linearGradient>
+    <linearGradient id="wash" x2="1" y2="1"><stop stop-color="#6b63e8" stop-opacity=".2"/><stop offset="1" stop-color="#4ca9c7" stop-opacity=".03"/></linearGradient>
+    <linearGradient id="panel" x2="0" y2="1"><stop stop-color="#222b43"/><stop offset="1" stop-color="#192137"/></linearGradient>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;fill:#f1f4ff;font-size:20px}
+      .muted{fill:#aab7d1}.small{font-size:17px}.label{font-size:15px;letter-spacing:2px;fill:#b5bdfc;font-weight:600}.heading{font-size:22px;font-weight:600}.line{stroke:#43506b;stroke-width:1}.check{fill:none;stroke:#a4b2cf;stroke-width:1.5}.dot{fill:#a3a5ff}.empty{fill:#4c5673}
+    </style>
+  </defs>
+  <rect width="1200" height="740" rx="24" fill="url(#desktop)"/>
+  <path d="M0 370C300 110 620 60 1200 350V740H0Z" fill="url(#wash)"/>
+  <rect x="1" y="1" width="1198" height="738" rx="23" fill="none" stroke="#39435f"/>
+  <text x="40" y="50" class="label">YOUR DESKTOP</text>
+  <text x="40" y="101" font-size="29" font-weight="600">Keep your place.</text>
+  <text x="40" y="134" class="muted small">Your current app stays underneath.</text>
+  <rect x="40" y="185" width="254" height="320" rx="14" fill="#111a2d" stroke="#2b3751"/>
+  <circle cx="59" cy="205" r="4" fill="#64718b"/><circle cx="74" cy="205" r="4" fill="#64718b"/><circle cx="89" cy="205" r="4" fill="#64718b"/>
+  <path d="M60 245H249M60 264H232M60 283H256M60 340H246M60 359H216M60 378H253" stroke="#364561" stroke-width="6" stroke-linecap="round"/>
+  <rect x="60" y="410" width="210" height="68" rx="7" fill="#1c2841"/>
+  <text x="40" y="591" class="label">ONE COORDINATED WORKSPACE</text>
+  <text x="40" y="627" class="muted small">Task details open inward.</text>
+  <text x="40" y="653" class="muted small">Main stays at the outer edge.</text>
+  <text x="350" y="50" class="label">TASK DETAILS</text>
+  <text x="777" y="50" class="label">MAIN PANEL · RIGHT EDGE</text>
+  <rect x="344" y="74" width="408" height="604" rx="22" fill="#000" opacity=".2"/>
+  <rect x="338" y="68" width="408" height="604" rx="22" fill="url(#panel)" stroke="#4e5b7b"/>
+  <text x="365" y="104" class="muted small">Back to Main</text>
+  <text x="365" y="149" class="heading">Prepare the lab report</text>
+  <text x="365" y="190" class="small muted">Description</text>
+  <rect x="362" y="204" width="360" height="83" rx="10" fill="#151e32"/>
+  <text x="377" y="233">Explain the results and keep</text>
+  <text x="377" y="260">the next experiment clear.</text>
+  <text x="365" y="326" class="heading">Steps</text>
+  <rect x="366" y="348" width="19" height="19" rx="6" fill="#a3a5ff"/>
+  <path d="m371 357 4 4 7-8" fill="none" stroke="#141b30" stroke-width="2"/>
+  <text x="398" y="364" class="muted">Collect measurements</text>
+  <path d="M398 358H614" stroke="#aab7d1"/>
+  <rect x="366" y="389" width="19" height="19" rx="6" class="check"/>
+  <text x="398" y="405">Compare the results</text>
+  <rect x="366" y="430" width="19" height="19" rx="6" class="check"/>
+  <text x="398" y="446">Write the discussion</text>
+  <text x="365" y="496" class="heading">Attached Notes</text>
+  <rect x="362" y="513" width="360" height="130" rx="11" fill="#151e32" stroke="#3b4863"/>
+  <text x="377" y="542" font-weight="600">Check the baseline</text>
+  <text x="377" y="572" class="muted small">Use the same reference conditions.</text>
+  <rect x="378" y="590" width="67" height="36" rx="5" fill="#2b3b5c"/>
+  <path d="m385 616 13-13 12 8 12-15 16 20" stroke="#a4b2ed" fill="none" stroke-width="2"/>
+  <text x="457" y="614" class="muted small">Local image attachment</text>
+  <rect x="774" y="74" width="396" height="604" rx="22" fill="#000" opacity=".2"/>
+  <rect x="768" y="68" width="396" height="604" rx="22" fill="url(#panel)" stroke="#647194"/>
+  <text x="795" y="110" class="heading">Quick Notes</text>
+  <rect x="792" y="129" width="344" height="81" rx="11" fill="#141d31" stroke="#6d75b3"/>
+  <text x="807" y="161" class="muted">Capture a thought…</text>
+  <text x="807" y="189" class="small muted">Return to save</text>
+  <rect x="792" y="222" width="344" height="60" rx="9" fill="#2b3551"/>
+  <text x="807" y="247" class="small">Ask about the next session</text>
+  <text x="807" y="269" class="small muted">Quick Note inbox</text>
+  <text x="795" y="325" class="heading">Main Tasks</text>
+  <text x="1042" y="325" class="small muted">+ New Task</text>
+  <rect x="786" y="340" width="356" height="58" rx="11" fill="#8589ff" fill-opacity=".14" stroke="#8589ff" stroke-opacity=".55"/>
+  <rect x="799" y="359" width="19" height="19" rx="6" class="check"/>
+  <text x="829" y="373" class="small">Prepare the lab report</text>
+  <circle cx="1082" cy="368" r="4" class="dot"/><circle cx="1095" cy="368" r="4" class="dot"/><circle cx="1108" cy="368" r="4" class="empty"/><circle cx="1121" cy="368" r="4" class="empty"/>
+  <rect x="799" y="420" width="19" height="19" rx="6" class="check"/>
+  <text x="829" y="435" class="small">Review lecture notes</text>
+  <circle cx="1082" cy="430" r="4" class="dot"/><circle cx="1095" cy="430" r="4" class="empty"/><circle cx="1108" cy="430" r="4" class="empty"/><circle cx="1121" cy="430" r="4" class="empty"/>
+  <rect x="799" y="478" width="19" height="19" rx="6" class="check"/>
+  <text x="829" y="493" class="small">Plan the prototype</text>
+  <circle cx="1082" cy="488" r="4" class="dot"/><circle cx="1095" cy="488" r="4" class="dot"/><circle cx="1108" cy="488" r="4" class="dot"/><circle cx="1121" cy="488" r="4" class="empty"/>
+  <path d="M795 525H1137" class="line"/>
+  <text x="795" y="562" class="heading">Recently Completed</text>
+  <text x="795" y="593" class="small muted">✓  Send the project outline</text>
+  <path d="M1116 636h18m-18 6h18m-18 6h18" stroke="#aab7d1" stroke-width="2" stroke-linecap="round"/>
+  <text x="795" y="648" class="small muted">Settings</text>
+  <rect x="1188" y="252" width="4" height="236" rx="2" fill="#a7adff"/>
+  <text x="40" y="710" class="small muted">EasyFlow · Workspace illustration · Example content</text>
+</svg>

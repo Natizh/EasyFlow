@@ -1,5 +1,7 @@
 # Accessibility regression audit and local approval gate
 
+[Documentation](README.md) · [Product specification](../PRODUCT_SPEC.md) · [Contributor guide](../CONTRIBUTING.md)
+
 Candidate date: 2026-10-03. Branch: `fix/accessibility-focus-regression`.
 The initial installed candidate was **1.4.0 (7)**. Publication was withheld pending user approval; the release follow-up below records the subsequent authorization.
 

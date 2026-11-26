@@ -1,5 +1,7 @@
 # Architecture
 
+[Documentation](README.md) · [Product specification](../PRODUCT_SPEC.md) · [Contributor guide](../CONTRIBUTING.md)
+
 ## Goals and constraints
 
 EasyFlow is a continuously resident native macOS utility with a very low-cost hidden state. It combines precise system-style overlay behavior, SwiftUI content, local SQLite persistence, and a narrow EventKit integration. There is no custom server, account, browser runtime, telemetry, or analytics.
@@ -27,26 +29,22 @@ Sources/EasyFlow/
   Reminders/   EventKit adapter, mapping, reconciliation
   Views/       SwiftUI Main/Secondary content and reusable views
   Settings/    settings model, UI, launch-at-login integration
+  Updates/     release checks, signature verification, app replacement
   Utilities/   small cross-cutting helpers only
 Tests/EasyFlowTests/
 ```
 
 ## Runtime composition
 
-```text
-EasyFlow application lifecycle
-  ├─ Dependency container
-  │   ├─ Database writer and repositories
-  │   ├─ Reminder store adapter and reconciliation service
-  │   ├─ Settings store / launch-at-login service
-  │   └─ Clock/scheduler abstractions for testable timing
-  ├─ Edge activation coordinator
-  │   ├─ display topology provider
-  │   ├─ pointer/event monitor
-  │   └─ pure activation/panel state machine
-  └─ Panel coordinator
-      ├─ Main NSPanel hosting SwiftUI
-      └─ Secondary NSPanel hosting contextual SwiftUI
+```mermaid
+flowchart TB
+    App["Application lifecycle"] --> Services["Data, settings, and services"]
+    App --> Edge["Edge coordinator"]
+    App --> Panels["Panel coordinator"]
+    Services --> Sync["Reminders adapter and reconciliation"]
+    Edge --> Machine["Activation state machine"]
+    Panels --> Main["Main Panel"]
+    Panels --> Secondary["Contextual Secondary Panel"]
 ```
 
 The dependency container composes concrete platform services at launch. Domain and state-machine logic depend on protocols/value types rather than AppKit or EventKit globals, allowing deterministic unit tests.
@@ -158,7 +156,7 @@ Automate pure logic for activation timers, panel transitions, sorting, reorder, 
 
 ## CI
 
-GitHub Actions runs `swift package resolve`, `swift build`, and `swift test` on `macos-15` for pushes to `main` and pull requests. Signing, packaging, and live EventKit tests remain local release checks.
+GitHub Actions runs shell syntax checks, `swift package resolve`, `swift build`, `swift test`, and development release packaging on `macos-15` for pushes to `main` and pull requests. Public signing, publication, and live EventKit checks remain separate maintainer release steps.
 
 ## Packaging
 

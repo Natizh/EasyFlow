@@ -1,5 +1,7 @@
 # EasyFlow Product Specification
 
+[Project overview](README.md) · [Documentation](docs/README.md) · [UX behavior](docs/UX_BEHAVIOR.md)
+
 ## Product identity and purpose
 
 EasyFlow is the product name, not a temporary codename. Product UI, code identifiers, settings labels, and project documentation are written in English by default. The dedicated Apple Reminders list is named `EasyFlow`.

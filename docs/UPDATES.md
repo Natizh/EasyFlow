@@ -1,5 +1,7 @@
 # Signed GitHub updates
 
+[Documentation](README.md) · [Product specification](../PRODUCT_SPEC.md) · [Contributor guide](../CONTRIBUTING.md)
+
 EasyFlow checks the public GitHub Releases `latest` endpoint for stable releases. The endpoint excludes drafts and prereleases; EasyFlow also checks those flags and compares numeric `major.minor.patch` versions before offering anything. Automatic checks are enabled by default in public builds, start about ten seconds after launch when due, and run at most once per 24 hours while the app remains open. Manual checks are always available in Settings. A GitHub rate limit or network error leaves the installed app untouched.
 
 ## Trust and limitations
